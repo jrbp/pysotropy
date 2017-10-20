@@ -39,6 +39,10 @@ class Shows(MutableSet):
         except ValueError:
             pass
 
+    def clearAll(self):
+        self.parent.sendCommand("CANCEL SHOW ALL")
+        self.shows = set()
+
 
 class Values(MutableMapping):
     """
@@ -51,7 +55,7 @@ class Values(MutableMapping):
         self.parent = parent
         self.vals = dict()
         if initial_values:
-            for k, v in initial_values.iteritems():
+            for k, v in initial_values.items():
                 self.__setitem__(k, v)
 
     def __setitem__(self, key, value):
@@ -70,6 +74,10 @@ class Values(MutableMapping):
 
     def __len__(self):
         return len(self.vals)
+
+    def clearAll(self):
+        self.parent.sendCommand("CANCEL VALUE ALL")
+        self.vals = dict()
 
 
 class IsotropySession:
@@ -118,7 +126,7 @@ class IsotropySession:
             if this_line == 'Use "VALUE IRREP VERSION" to change version\n':
                 keep_reading = False
 
-        self.screen = 10000  # exploit this too make parsing output easier?
+        self.screen = 80  # exploit this too make parsing output easier?
         self.sendCommand("SCREEN {}".format(self.screen))
         self.page = "NOBREAK"
         self.sendCommand("PAGE {}".format(self.page))
@@ -133,6 +141,12 @@ class IsotropySession:
             self.sendCommand("SETTING {}".format(s))
         self.values = Values(self, values)
         self.shows = Shows(self, shows)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exec_type, exc_value, exc_traceback):
+        self.sendCommand("QUIT")
 
     def sendCommand(self, command):
         self.iso_process.stdin.write(bytes(command + "\n", "ascii"))
@@ -150,66 +164,74 @@ class IsotropySession:
         return lines
 
 
-# def getSymOps(spacegroup, setting=None):
-#     values = [("parent", spacegroup)]
-#     shows = ["elements"]
-#     id = IsotropySession(values, shows, setting=setting)
-#     res = id.getDisplayData("parent")
-#     symOps = [(s + ")").replace(",", " ").replace("|", " ").replace("(", "").replace(")", "") for s in res.strip("\n").split("),")]
-#     return symOps
-# 
-# 
-# def getKpoints(spacegroup, setting=None):
-#     values = [("parent", spacegroup)]
-#     shows = ["kpoint"]
-#     id = IsotropySession(values, shows, setting=setting)
-#     res = id.getDisplayData("kpoint")
-#     matches = re.findall(r'([A-Z][A-Z]?)\s*\((.*)\)', res)
-#     kpoints = {lbl: tuple([p for p in loc.split(",")]) for lbl, loc in matches}
-#     return kpoints
-# 
-# 
-# def getIrreps(spacegroup, kpoint=None, setting=None):
-#     values = [("parent", spacegroup)]
-#     if kpoint:
-#         values.append(("kpoint", kpoint))
-#     shows = ["irrep"]
-#     id = IsotropySession(values, shows, setting=setting)
-#     res = id.getDisplayData("irrep")
-#     return res.split("\n")
-# 
-# 
-# def getRepresentation(spacegroup, irrep, element, setting=None):
-#     values = [("parent", spacegroup), ("irrep", irrep), ("element", element)]
-#     shows = ["matrix"]
-#     id = IsotropySession(values, shows, setting=setting)
-#     res = id.getDisplayData("irrep")
-#     raw_lines = res.split("\n")
-#     lines = []
-#     lines.append(re.match(r'\(.*\)\s*(.*)', raw_lines[0]).groups()[0])
-#     for l in raw_lines[1:]:
-#         lines.append(re.match(r'\s*(.*)', l).groups()[0])
-#     matrix = [[float(i) for i in r.split()] for r in lines if not r == '']
-#     return matrix
+def getSymOps(spacegroup, setting=None):
+    values = {"parent": spacegroup}
+    shows = ["elements"]
+    with IsotropySession(values, shows, setting=setting) as isos:
+        lines = isos.getDisplayData("parent")
+        symOps = []
+        for line in lines:
+            symOps += re.findall(r'\(([A-Za-z0-9]*)\|([0-9,/]*)\)', line)
+    return symOps
+
+
+def getKpoints(spacegroup, setting=None):
+    values = {"parent": spacegroup}
+    shows = ["kpoint"]
+    with IsotropySession(values, shows, setting=setting) as isos:
+        lines = isos.getDisplayData("kpoint")
+        kpoints = []
+        for line in lines:
+            kpoints += re.findall(r'([A-Z][A-Z]?)\s*\((.*)\)', line)
+        kpt_dict = {label: tuple([p for p in loc.split(",")])
+                    for label, loc in kpoints}
+    return kpt_dict
+
+
+def getIrreps(spacegroup, kpoint=None, setting=None):
+    values = {"parent": spacegroup}
+    if kpoint:
+        values["kpoint"] = kpoint
+    shows = ["irrep"]
+    with IsotropySession(values, shows, setting=setting) as isos:
+        lines = isos.getDisplayData("irrep")
+        irreps = []
+        for line in lines:
+            irreps += re.findall(r'^([A-Z].*)\n', line)
+    return irreps
+
+
+def getRepresentations(spacegroup, kpoint_label, setting=None):
+    elements = getSymOps(spacegroup, setting)
+    irreps = getIrreps(spacegroup, kpoint_label, setting)
+    values = {"parent": spacegroup, "kpoint": kpoint_label}
+    shows = ["matrix"]
+    irrep_dict = {}
+    with IsotropySession(values, shows, setting=setting) as isos:
+        for irrep in irreps:
+            isos.values["irrep"] = irrep
+            mat_list = []
+            for element in elements:
+                elem_str = "{} {}".format(element[0],
+                                          element[1].replace(",", " "))
+                isos.values["element"] = elem_str
+                lines = isos.getDisplayData("irrep")
+                temp_lines = []
+                temp_lines.append(re.match(r'\(.*\)\s*(.*)',
+                                           lines[1]).groups()[0])
+                for line in lines[2:-1]:
+                    temp_lines.append(re.match(r'\s*(.*)', line).groups()[0])
+                matrix = [[float(i) for i in r.split()]
+                          for r in temp_lines if not r == '']
+                mat_list.append(matrix)
+            irrep_dict[irrep] = mat_list
+    return irrep_dict
 
 
 if __name__ == '__main__':
-    # iso_location = "/home/john/scripts/isobyu/"
-    # iso_command = ("ISODATA={} ".format(iso_location)
-    #                + os.path.join(iso_location, 'iso'))
-    # spacegroup = 221
-    # elements = getSymOps(spacegroup)
-    # print(elements)
-    # print()
-    # kpoints = getKpoints(spacegroup)
-    # print(kpoints)
-    # print()
-    # kptlist = [k for k in kpoints]
-    # irreps = getIrreps(spacegroup, kptlist[0])
-    # print(irreps)
-    # print()
-    # for irr in irreps:
-    #     print(irr)
-    #     for element in elements:
-    #         print(getRepresentation(spacegroup, irr, element))
-    print()
+    spacegroup = 221
+    print(getSymOps(spacegroup))
+    print(getKpoints(spacegroup))
+    print(getIrreps(spacegroup))
+    print(getRepresentations(spacegroup,
+                             list(getKpoints(spacegroup).keys())[0]))
