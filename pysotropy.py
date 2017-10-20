@@ -2,7 +2,8 @@
 from __future__ import print_function
 import os
 from collections import MutableMapping, MutableSet
-from subprocess import Popen, PIPE
+from subprocess import PIPE
+from sarge import Command, Capture
 import re
 """
 Very rough interface to isotropy
@@ -12,8 +13,10 @@ Very rough interface to isotropy
 class Shows(MutableSet):
     def __init__(self, parent, initial_shows):
         self.shows = set()
-        for item in initial_shows:
-            self.add(item)
+        self.parent = parent
+        if initial_shows:
+            for item in initial_shows:
+                self.add(item)
 
     def __contains__(self, item):
         return item in self.shows
@@ -26,15 +29,13 @@ class Shows(MutableSet):
 
     def add(self, item):
         if item not in self.shows:
-            self.parent.iso_session.comunicate(
-                input="SHOW {}".format(item))
-            self.show.add(item)
+            self.parent.sendCommand("SHOW {}".format(item))
+            self.shows.add(item)
 
     def discard(self, item):
         try:
             self.shows.remove(item)
-            self.parent.iso_session.comunicate(
-                input="CANCEL SHOW {}".format(item))
+            self.parent.sendCommand("CANCEL SHOW {}".format(item))
         except ValueError:
             pass
 
@@ -49,20 +50,19 @@ class Values(MutableMapping):
         '''Use the object dict'''
         self.parent = parent
         self.vals = dict()
-        for k, v in initial_values.iteritems():
-            self.__setitem__(k, v)
+        if initial_values:
+            for k, v in initial_values.iteritems():
+                self.__setitem__(k, v)
 
     def __setitem__(self, key, value):
-        self.parent.iso_session.comunicate(
-            input="VALUE {} {}".format(key, value))
+        self.parent.sendCommand("VALUE {} {}".format(key, value))
         self.vals[key] = value
 
     def __getitem__(self, key):
         return self.vals[key]
 
     def __delitem__(self, key):
-        self.parent.iso_session.comunicate(
-            input="CANCEL VALUE {}".format(key))
+        self.parent.sendCommand("CANCEL VALUE {}".format(key))
         del self.vals[key]
 
     def __iter__(self):
@@ -106,18 +106,22 @@ class IsotropySession:
             when creating an Isotropy object, not changed later
         """
         iso_location = "/home/john/scripts/isobyu/"  # TODO: don't hard code
-        # self.iso_command = ("ISODATA={} ".format(iso_location)
-        #                     + os.path.join(iso_location, 'iso'))
-        self.iso_session = Popen(os.path.join(iso_location, 'iso'), stdin=PIPE,
-                                 stdout=PIPE, stderr=PIPE,
-                                 universal_newlines=True,
-                                 env=dict(os.environ,
-                                          **{"ISODATA": iso_location}))
+        self.iso_process = Command(os.path.join(iso_location, 'iso'),
+                                   stdout=Capture(buffer_size=1),
+                                   env={"ISODATA": iso_location})
+        self.iso_process.run(input=PIPE, async=True)
 
-        self.screen = 100000  # exploit this too make parsing output easier?
-        self.iso_session.communicate(input="SCREEN {} \n".format(self.screen))
+        # move past initial output
+        keep_reading = True
+        while keep_reading:
+            this_line = self.iso_process.stdout.readline().decode()
+            if this_line == 'Use "VALUE IRREP VERSION" to change version\n':
+                keep_reading = False
+
+        self.screen = 10000  # exploit this too make parsing output easier?
+        self.sendCommand("SCREEN {}".format(self.screen))
         self.page = "NOBREAK"
-        self.iso_session.communicate(input="PAGE {}".format(self.page))
+        self.sendCommand("PAGE {}".format(self.page))
         if setting:
             if type(setting) == list:
                 self.setting = setting
@@ -126,52 +130,24 @@ class IsotropySession:
         else:
             self.setting = ["INTERNATIONAL"]
         for s in self.setting:
-            self.iso_session.communicate(input="SETTING {}".format(s))
+            self.sendCommand("SETTING {}".format(s))
         self.values = Values(self, values)
         self.shows = Shows(self, shows)
 
-        # self.values = values
-        # self.shows = shows
-        # if setting:
-        #     if type(setting) == list:
-        #         self.setting = setting
-        #     else:
-        #         self.setting = [setting]
-        # else:
-        #     self.setting = ["INTERNATIONAL"]
-        # self.page = "NOBREAK"
-        # self.screen = 100000  # exploit this too make parsing output easier?
-
-        # self.commands = ["SCREEN {}".format(self.screen),
-        #                  "PAGE {}".format(self.page)]
-        # for s in self.setting:
-        #     self.commands.append("SETTING {}".format(s))
-        # for value in self.values:
-        #     self.commands.append("VALUE {} {}".format(*value))
-        # for show in self.shows:
-        #     self.commands.append("SHOW {}".format(show))
+    def sendCommand(self, command):
+        self.iso_process.stdin.write(bytes(command + "\n", "ascii"))
+        self.iso_process.stdin.flush()
 
     def getDisplayData(self, display, debug=False):
-        # cmd = (self.iso_command + " <<<'" + "\n"
-        #        + "\n".join(self.commands) + "\n"
-        #        + "DISPLAY {}".format(display) + "\n"
-        #        + "QUIT" + "\n"
-        #        + "\n'")
-        # output = subprocess.check_output(['bash', '-c', cmd]).decode()
-        stdout, stderr = self.iso_session.communicate(
-            input="DISPLAY {}".format(display))
-        if debug:
-            print(stdout)
-            print(stderr)
-        result_lines = []
-        in_result_block = False
-        for line in stdout.split("\n"):
-            if in_result_block:
-                result_lines.append(line)
-            if line[0] == "*":
-                in_result_block = not in_result_block
-            result = "\n".join(result_lines[:-1])
-        return result
+        self.sendCommand("DISPLAY {}".format(display))
+        lines = []
+        keep_reading = True
+        while keep_reading:
+            this_line = self.iso_process.stdout.readline().decode()
+            if this_line == '*':
+                keep_reading = False
+            lines.append(this_line)
+        return lines
 
 
 # def getSymOps(spacegroup, setting=None):
