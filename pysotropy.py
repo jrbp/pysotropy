@@ -83,8 +83,11 @@ class Values(MutableMapping):
 class IsotropySession:
     """
     Make simple requests to isotropy.
-    capable of making arbitrary requests
     isotropy session is kept running in background until closed
+    should be used with 'with' statements to ensure isotropy is exited properly
+    ex:
+    with IsotropySession() as isos:
+        do things with isos
     """
     def __init__(self, values=None, shows=None,
                  labels=None, setting=None):
