@@ -16,9 +16,11 @@ class Shows(MutableSet):
         self.parent = parent
         if initial_shows:
             for item in initial_shows:
+                item = item.upper()
                 self.add(item)
 
     def __contains__(self, item):
+        item = item.upper()
         return item in self.shows
 
     def __iter__(self):
@@ -28,11 +30,13 @@ class Shows(MutableSet):
         return len(self.shows)
 
     def add(self, item):
+        item = item.upper()
         if item not in self.shows:
             self.parent.sendCommand("SHOW {}".format(item))
             self.shows.add(item)
 
     def discard(self, item):
+        item = item.upper()
         try:
             self.shows.remove(item)
             self.parent.sendCommand("CANCEL SHOW {}".format(item))
@@ -56,16 +60,20 @@ class Values(MutableMapping):
         self.vals = dict()
         if initial_values:
             for k, v in initial_values.items():
+                k = k.upper()
                 self.__setitem__(k, v)
 
     def __setitem__(self, key, value):
+        key = key.upper()
         self.parent.sendCommand("VALUE {} {}".format(key, value))
         self.vals[key] = value
 
     def __getitem__(self, key):
+        key = key.upper()
         return self.vals[key]
 
     def __delitem__(self, key):
+        key = key.upper()
         self.parent.sendCommand("CANCEL VALUE {}".format(key))
         del self.vals[key]
 
