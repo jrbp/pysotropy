@@ -12,7 +12,7 @@ Very rough interface to isotropy
 
 class Shows(MutableSet):
     def __init__(self, parent, initial_shows):
-        self.shows = set()
+        self._shows = set()
         self.parent = parent
         if initial_shows:
             for item in initial_shows:
@@ -21,31 +21,31 @@ class Shows(MutableSet):
 
     def __contains__(self, item):
         item = item.upper()
-        return item in self.shows
+        return item in self._shows
 
     def __iter__(self):
-        return iter(self.shows)
+        return iter(self._shows)
 
     def __len__(self):
-        return len(self.shows)
+        return len(self._shows)
 
     def add(self, item):
         item = item.upper()
-        if item not in self.shows:
+        if item not in self._shows:
             self.parent.sendCommand("SHOW {}".format(item))
-            self.shows.add(item)
+            self._shows.add(item)
 
     def discard(self, item):
         item = item.upper()
         try:
-            self.shows.remove(item)
+            self._shows.remove(item)
             self.parent.sendCommand("CANCEL SHOW {}".format(item))
         except ValueError:
             pass
 
     def clearAll(self):
         self.parent.sendCommand("CANCEL SHOW ALL")
-        self.shows = set()
+        self._shows = set()
 
 
 class Values(MutableMapping):
@@ -57,7 +57,7 @@ class Values(MutableMapping):
     def __init__(self, parent, initial_values):
         '''Use the object dict'''
         self.parent = parent
-        self.vals = dict()
+        self._vals = dict()
         if initial_values:
             for k, v in initial_values.items():
                 k = k.upper()
@@ -66,26 +66,26 @@ class Values(MutableMapping):
     def __setitem__(self, key, value):
         key = key.upper()
         self.parent.sendCommand("VALUE {} {}".format(key, value))
-        self.vals[key] = value
+        self._vals[key] = value
 
     def __getitem__(self, key):
         key = key.upper()
-        return self.vals[key]
+        return self._vals[key]
 
     def __delitem__(self, key):
         key = key.upper()
         self.parent.sendCommand("CANCEL VALUE {}".format(key))
-        del self.vals[key]
+        del self._vals[key]
 
     def __iter__(self):
-        return iter(self.vals)
+        return iter(self._vals)
 
     def __len__(self):
-        return len(self.vals)
+        return len(self._vals)
 
     def clearAll(self):
         self.parent.sendCommand("CANCEL VALUE ALL")
-        self.vals = dict()
+        self._vals = dict()
 
 
 class IsotropySession:
