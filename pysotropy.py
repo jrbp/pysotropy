@@ -5,8 +5,6 @@ from collections import MutableMapping, MutableSet
 from subprocess import PIPE
 from sarge import Command, Capture
 import re
-import numpy as np
-import pymatgen as pmg
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 """
 Very rough interface to isotropy
@@ -323,7 +321,10 @@ def getAllowedMicroDistortions(phase_transition):
     """
     sga_hs = SpacegroupAnalyzer(phase_transition['structure_high_sym'])
     wyckoffs = ' '.join(set(sga_hs.get_symmetry_dataset()['wyckoffs']))
-    values = {'parent': phase_transition['parent'], 'wyckoff': wyckoffs}
+    values = {'parent': phase_transition['parent'],
+              'wyckoff': wyckoffs,
+              'cell': ' '.join([','.join([str(int(el)) for el in row])
+                                for row in phase_transition['structure_high_sym'].lattice.matrix.round()])}
     shows = ['wyckoff', 'microscopic vector']
     dists = []
     with IsotropySession(values, shows) as isos:
@@ -336,12 +337,13 @@ def getAllowedMicroDistortions(phase_transition):
             for line in raw_dist_out:
                 if re.match('.*Wyckoff Point.*', line) or re.match(r'\*\*+', line) or line == '':
                     pass
-                elif line[0] in wyckoffs.split():
+                # elif line[0] in wyckoffs.split():
+                elif re.match('[a-z]', line[0]):
                     if not first_dist:
                         distortions.append(this_dist)
                     wyck_lbl, point= line.split()[:2]
                     proj_vecs = line.split()[2:]
-                    this_dist = (wyck_lbl, [to_array(point)], [[to_array(pv) for pv in proj_vecs]])
+                    this_dist = (wyck_lbl, [to_array(point)], [[to_array(pv.rstrip(',')) for pv in proj_vecs]])
                     first_dist = False
                 elif line == '*':
                     distortions.append(this_dist)
@@ -349,7 +351,7 @@ def getAllowedMicroDistortions(phase_transition):
                     point = line.split()[0]
                     proj_vecs = line.split()[1:]
                     this_dist[1].append(to_array(point))
-                    this_dist[2].append([to_array(pv) for pv in proj_vecs])
+                    this_dist[2].append([to_array(pv.rstrip(',')) for pv in proj_vecs])
             if len(distortions) == 0:
                 pass
             else:
