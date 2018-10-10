@@ -172,6 +172,8 @@ class IsotropySession:
             this_line = self.iso_process.stdout.readline().decode()
             if this_line in ['*', '']:  # if there is no output '' is returned above
                 keep_reading = False
+            elif re.match(".* Enter RETURN to continue.*", this_line):
+                self.sendCommand("")
             lines.append(this_line)
         return lines
 
@@ -264,7 +266,7 @@ def getPossiblePhaseTransitions(struct_hs, struct_ls):
     sgn_hs = sga_hs.get_space_group_number()
     sgn_ls = sga_ls.get_space_group_number()
     # not limiting results by ratio since the size in isotropy doesn't account for changes of unit cell
-    # seems like it might only allow for diagonal basis??
+    # seems like it might only allow for diagonal basis?? NO! even tutorial has examples with nondiagonal basis
     # ratio = len(struct_ls_p) / len(struct_hs_p)
     # if ratio % 1 != 0:
     #     raise ValueError(("Number of sites in low symmetry structure must be",
