@@ -324,9 +324,7 @@ def getAllowedMicroDistortions(phase_transition):
     sga_hs = SpacegroupAnalyzer(phase_transition['structure_high_sym'])
     wyckoffs = ' '.join(set(sga_hs.get_symmetry_dataset()['wyckoffs']))
     values = {'parent': phase_transition['parent'],
-              'wyckoff': wyckoffs,
-              'cell': ' '.join([','.join([str(int(el)) for el in row])
-                                for row in phase_transition['structure_high_sym'].lattice.matrix.round()])}
+              'wyckoff': wyckoffs}
     shows = ['wyckoff', 'microscopic vector']
     dists = []
     with IsotropySession(values, shows) as isos:
