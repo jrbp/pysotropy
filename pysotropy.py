@@ -205,18 +205,19 @@ class IsotropySession:
     def _parse_output(self, lines):
         indexes = detect_column_indexes(lines)
         split_by_ind = [split_line_by_indexes(indexes, line) for line in lines]
-        # grouping of lines (for wyckoff, matricies)
-        transitions = [not row[0] == '' for row in split_by_ind]
         result_list = []
-        for new_el, elem in zip(transitions[1:], split_by_ind[1:]):
-            if new_el:
+        for row in split_by_ind[1:]:
+            if row[0]:
                 result = {}
-            for j, prop in enumerate(elem):
-                if new_el:
+                result_list.append(result)
+            for j, prop in enumerate(row):
+                if row[0]:
                     result[split_by_ind[0][j]] = prop
                 elif prop:
-                    result[split_by_ind[0][j]] += "\n{}".format(prop)
-            result_list.append(result)
+                    if isinstance(result[split_by_ind[0][j]], list):
+                        result[split_by_ind[0][j]].append(prop)
+                    else:
+                        result[split_by_ind[0][j]] = [result[split_by_ind[0][j]], prop]
         return result_list
 
 
