@@ -1,15 +1,17 @@
 #!/bin/env python3
-from __future__ import print_function
 import os
+import logging
 from collections import MutableMapping, MutableSet
 from subprocess import PIPE
 from sarge import Command, Capture
 import re
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 """
-Very rough interface to isotropy
+Python interface to isotropy
 """
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 class Shows(MutableSet):
     def __init__(self, parent, initial_shows):
@@ -126,6 +128,9 @@ class IsotropySession:
             when creating an Isotropy object, not changed later
         """
         iso_location = "/home/john/scripts/isobyu/"  # TODO: don't hard code
+        logger.debug("""starting isotropy session in {}
+                        using isotropy in: {}""".format(
+                            os.getcwd(), iso_location))
         self.iso_process = Command(os.path.join(iso_location, 'iso'),
                                    stdout=Capture(buffer_size=1),
                                    env={"ISODATA": iso_location})
@@ -135,6 +140,7 @@ class IsotropySession:
         keep_reading = True
         while keep_reading:
             this_line = self.iso_process.stdout.readline().decode()
+            logger.debug("isotropy: {}".format(this_line))
             if this_line == 'Use "VALUE IRREP VERSION" to change version\n':
                 keep_reading = False
 
@@ -161,6 +167,7 @@ class IsotropySession:
         self.sendCommand("QUIT")
 
     def sendCommand(self, command):
+        logger.debug("sending: {}".format(command))
         self.iso_process.stdin.write(bytes(command + "\n", "ascii"))
         self.iso_process.stdin.flush()
 
@@ -170,6 +177,7 @@ class IsotropySession:
         keep_reading = True
         while keep_reading:
             this_line = self.iso_process.stdout.readline().decode()
+            logger.debug("isotropy: {}".format(this_line))
             if this_line in ['*', '']:  # if there is no output '' is returned above
                 keep_reading = False
             elif re.match(".*Data base for these coupled subgroups .*", this_line):
@@ -378,9 +386,13 @@ def to_array(ar_str):
 
 
 if __name__ == '__main__':
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.INFO)
+    logger.addHandler(stream_handler)
+
     spacegroup = 221
-    print(getSymOps(spacegroup))
-    print(getKpoints(spacegroup))
-    print(getIrreps(spacegroup))
-    print(getRepresentations(spacegroup,
+    logger.info(getSymOps(spacegroup))
+    logger.info(getKpoints(spacegroup))
+    logger.info(getIrreps(spacegroup))
+    logger.info(getRepresentations(spacegroup,
                              list(getKpoints(spacegroup).keys())[0]))
