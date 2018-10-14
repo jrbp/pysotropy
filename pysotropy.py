@@ -172,8 +172,15 @@ class IsotropySession:
             this_line = self.iso_process.stdout.readline().decode()
             if this_line in ['*', '']:  # if there is no output '' is returned above
                 keep_reading = False
-            elif re.match(".* Enter RETURN to continue.*", this_line):
+            elif re.match(".*Data base for these coupled subgroups .*", this_line):
+                self.iso_process.stdout.readline() # read past Should this
+                self.iso_process.stdout.readline() # read past Enter RETURN
                 self.sendCommand("")
+                self.iso_process.stdout.readline() # read past Adding
+                self.iso_process.stdout.readline() # read past Blank
+                #self.iso_process.stdout.readline()) # read past Blank
+                continue
+            #lines.append(this_line.lstrip('*')) #breaks the microdsitortion function atm
             lines.append(this_line)
         return lines
 
