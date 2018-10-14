@@ -147,7 +147,8 @@ class IsotropySession:
 
         self.screen = 999  # exploit this too make parsing output easier?
         self.sendCommand("SCREEN {}".format(self.screen))
-        self.page = "NOBREAK"
+        #self.page = "NOBREAK" # still feels the need to periodicly put in labels
+        self.page = "999"
         self.sendCommand("PAGE {}".format(self.page))
         if setting:
             if type(setting) == list:
