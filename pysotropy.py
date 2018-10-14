@@ -433,8 +433,12 @@ def to_array(ar_str):
 
 
 if __name__ == '__main__':
+    import sys
     stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(logging.INFO)
+    if sys.argv[1] == 'd':
+        stream_handler.setLevel(logging.DEBUG)
+    else:
+        stream_handler.setLevel(logging.INFO)
     logger.addHandler(stream_handler)
 
     spacegroup = 221
