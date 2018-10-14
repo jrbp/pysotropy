@@ -140,7 +140,8 @@ class IsotropySession:
         keep_reading = True
         while keep_reading:
             this_line = self.iso_process.stdout.readline().decode()
-            logger.debug("isotropy: {}".format(this_line))
+            if this_line: # don't log until isotropy responds
+                logger.debug("isotropy: {}".format(this_line))
             if this_line == 'Use "VALUE IRREP VERSION" to change version\n':
                 keep_reading = False
 
