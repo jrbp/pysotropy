@@ -169,211 +169,256 @@ class IsotropySession:
         self.sendCommand("QUIT")
 
     def sendCommand(self, command):
-        logger.debug("sending: {}".format(command))
+        # read the '*' that indicates the prompt so they don't build up
+        this_line = self.read_iso_line()
+        # logger.debug("reading *: {}".format(this_line))
         self.iso_process.stdin.write(bytes(command + "\n", "ascii"))
         self.iso_process.stdin.flush()
 
-    def getDisplayData(self, display, debug=False):
+    def getDisplayData(self, display, parsed=False):
         self.sendCommand("DISPLAY {}".format(display))
         lines = []
         keep_reading = True
         while keep_reading:
-            this_line = self.iso_process.stdout.readline().decode()
-            logger.debug("isotropy: {}".format(this_line))
+            this_line = self.read_iso_line()
             if this_line in ['*', '']:  # if there is no output '' is returned above
                 keep_reading = False
             elif re.match(".*Data base for these coupled subgroups .*", this_line):
-                self.iso_process.stdout.readline() # read past Should this
-                self.iso_process.stdout.readline() # read past Enter RETURN
+                self.read_iso_line() # read past Should this
+                self.read_iso_line() # read past Enter RETURN
                 self.sendCommand("")
-                self.iso_process.stdout.readline() # read past Adding
-                self.iso_process.stdout.readline() # read past Blank
-                #self.iso_process.stdout.readline()) # read past Blank
-                continue
-            #lines.append(this_line.lstrip('*')) #breaks the microdsitortion function atm
-            lines.append(this_line)
+                self.read_iso_line() # read past Adding
+                self.read_iso_line() # read past Blank
+                #self.read_iso_line() # read past Blank
+            else:
+                lines.append(this_line)
+        if parsed:
+            return self._parse_output(lines)
         return lines
 
+    def read_iso_line(self):
+        raw = self.iso_process.stdout.readline().decode()
+        this_line = raw.rstrip('\n')
+        logger.debug("isotropy: {}".format(this_line))
+        return this_line
 
-def getSymOps(spacegroup, setting=None):
-    values = {'parent': spacegroup}
-    shows = ['elements']
-    with IsotropySession(values, shows, setting=setting) as isos:
-        lines = isos.getDisplayData('parent')
-        symOps = []
-        for line in lines:
-            symOps += re.findall(r'\(([A-Za-z0-9]*)\|([0-9,/]*)\)', line)
-    return symOps
-
-
-def getKpoints(spacegroup, setting=None):
-    values = {'parent': spacegroup}
-    shows = ['kpoint']
-    with IsotropySession(values, shows, setting=setting) as isos:
-        lines = isos.getDisplayData('kpoint')
-        kpoints = []
-        for line in lines:
-            kpoints += re.findall(r'([A-Z][A-Z]?)\s*\((.*)\)', line)
-        kpt_dict = {label: tuple([p for p in loc.split(',')])
-                    for label, loc in kpoints}
-    return kpt_dict
-
-
-def getIrreps(spacegroup, kpoint=None, setting=None):
-    values = {'parent': spacegroup}
-    if kpoint:
-        values['kpoint'] = kpoint
-    shows = ['irrep']
-    with IsotropySession(values, shows, setting=setting) as isos:
-        lines = isos.getDisplayData('irrep')
-        irreps = []
-        for line in lines:
-            irreps += re.findall(r'^([A-Z].*)\n', line)
-    return irreps
+    def _parse_output(self, lines):
+        indexes = detect_column_indexes(lines)
+        split_by_ind = [split_line_by_indexes(indexes, line) for line in lines]
+        # grouping of lines (for wyckoff, matricies)
+        transitions = [not row[0] == '' for row in split_by_ind]
+        result_list = []
+        for new_el, elem in zip(transitions[1:], split_by_ind[1:]):
+            if new_el:
+                result = {}
+            for j, prop in enumerate(elem):
+                if new_el:
+                    result[split_by_ind[0][j]] = prop
+                elif prop:
+                    result[split_by_ind[0][j]] += "\n{}".format(prop)
+            result_list.append(result)
+        return result_list
 
 
-def getRepresentations(spacegroup, kpoint_label, setting=None):
-    elements = getSymOps(spacegroup, setting)
-    irreps = getIrreps(spacegroup, kpoint_label, setting)
-    values = {'parent': spacegroup, 'kpoint': kpoint_label}
-    shows = ['matrix']
-    irrep_dict = {}
-    with IsotropySession(values, shows, setting=setting) as isos:
-        for irrep in irreps:
-            isos.values['irrep'] = irrep
-            mat_list = []
-            for element in elements:
-                elem_str = '{} {}'.format(element[0],
-                                          element[1].replace(',', ' '))
-                isos.values['element'] = elem_str
-                lines = isos.getDisplayData('irrep')
-                temp_lines = []
-                temp_lines.append(re.match(r'\(.*\)\s*(.*)',
-                                           lines[1]).groups()[0])
-                for line in lines[2:-1]:
-                    temp_lines.append(re.match(r'\s*(.*)', line).groups()[0])
-                matrix = [[float(i) for i in r.split()]
-                          for r in temp_lines if not r == '']
-                mat_list.append(matrix)
-            irrep_dict[irrep] = mat_list
-    return irrep_dict
+def detect_column_indexes(list_of_lines):
+    indexes = [0]
+    transitions = [col.count(' ') == len(list_of_lines) for col in zip(*list_of_lines)]
+    last = False
+    for i, x in enumerate(transitions):
+        if not x and last and list_of_lines[0][i] != ' ':
+            indexes.append(i)
+        last = x
+    return indexes
+
+def split_line_by_indexes(indexes, line):
+    tokens = []
+    for i1, i2 in zip(indexes[:-1], indexes[1:]): #pairs
+        tokens.append(line[i1:i2].rstrip())
+    tokens.append(line[indexes[-1]:].rstrip())
+    return tokens
 
 
-def getPossiblePhaseTransitions(struct_hs, struct_ls):
-    """
-    Given two pymatgen structure objects (high symmetry and low symmetry)
-    find all irreps describing an order parameter of the phase transition between these structures
 
-    returns a 'phase transition' which is just a dict containing:
-            'structure_high_sym'
-            'structure_low_sym'
-            'parent'
-            'subgroup'
-            'irrep'
-            'direction'
-            'basis'
-            'origin'
-            'secondary_OPs' - other order parameters which do not lower symmetry more than the primary OP
-                              a dict of 'irrep', 'direction', 'domain', 'frequency'
-    """
-    sga_hs = SpacegroupAnalyzer(struct_hs)
-    sga_ls = SpacegroupAnalyzer(struct_ls)
-    struct_hs_p = sga_hs.get_primitive_standard_structure()
-    struct_ls_p = sga_ls.get_primitive_standard_structure()
-    sgn_hs = sga_hs.get_space_group_number()
-    sgn_ls = sga_ls.get_space_group_number()
-    # not limiting results by ratio since the size in isotropy doesn't account for changes of unit cell
-    # seems like it might only allow for diagonal basis?? NO! even tutorial has examples with nondiagonal basis
-    # ratio = len(struct_ls_p) / len(struct_hs_p)
-    # if ratio % 1 != 0:
-    #     raise ValueError(("Number of sites in low symmetry structure must be",
-    #                       " an integer times the number of sites in high symmetry structure"))
-    # ratio = int(ratio)
-    # values = {'parent': sgn_hs, 'subgroup': sgn_ls, 'size': ratio}
-    values = {'parent': sgn_hs, 'subgroup': sgn_ls}
-    shows = ['irrep', 'direction', 'basis', 'origin']
-    possible_transitions = []
-    with IsotropySession(values, shows) as isos:
-        lines = isos.getDisplayData('ISOTROPY')
-        for line in lines[1:-1]:
-            irrep, direction, basis, origin = line.split()[:4]
-            this_transition = {'structure_high_sym': struct_hs_p,
-                               'structure_low_sym': struct_ls_p,
-                               'parent': sgn_hs,
-                               'subgroup': sgn_ls,
-                               'irrep': irrep,
-                               'direction': direction,
-                               'basis': to_array(basis),
-                               'origin': to_array(origin)}
-            isos.shows.clearAll()
-            isos.shows.add('frequency direction')
-            isos.values['irrep'] = irrep
-            freq_output = isos.getDisplayData('ISOTROPY')
-            del isos.values['irrep']
-            raw_sec_ops = freq_output[1].split(',')
-            sec_ops = []
-            for sop in raw_sec_ops:
-                freq, s_irrep, raw_s_dir = sop.split()
-                freq = int(freq)
-                s_dir, s_domain = raw_s_dir.rstrip(')').split('(')
-                sec_ops.append({'irrep': s_irrep,
-                                'direction': s_dir,
-                                'frequency': freq,
-                                'domain': s_domain})
-            this_transition['secondary_OPs'] = sec_ops
-            possible_transitions.append(this_transition)
-    return possible_transitions
-
-
-def getAllowedMicroDistortions(phase_transition):
-    """
-    Given a 'phase transition' (likely from the getPossiblePhaseTransitions function)
-    find allowed displacive modes for all primary and secondary order parameters
-
-    returns a list where each element corresponds to an order parameter
-    each element of this list is a tuple where the first element is a dict describing the order parameter
-    and the second element is a list of modes
-    each mode is a tuple of the form (wyckoff label, [points], [(displacement vectors)])
-    the actual distortions can then by projected on to the displacement vectors to
-    separate the contributions from each mode
-    displacement vectors is a tuple since multidimensional irreps will have more than one at each point
-    """
-    sga_hs = SpacegroupAnalyzer(phase_transition['structure_high_sym'])
-    wyckoffs = ' '.join(set(sga_hs.get_symmetry_dataset()['wyckoffs']))
-    values = {'parent': phase_transition['parent'],
-              'wyckoff': wyckoffs}
-    shows = ['wyckoff', 'microscopic vector']
-    dists = []
-    with IsotropySession(values, shows) as isos:
-        for s_op in phase_transition['secondary_OPs']:
-            isos.values['irrep'] = s_op['irrep']
-            isos.values['direction'] = s_op['direction']
-            raw_dist_out = isos.getDisplayData('DISTORTION')
-            distortions = []
-            first_dist = True
-            for line in raw_dist_out:
-                if re.match('.*Wyckoff Point.*', line) or re.match(r'\*\*+', line) or line == '':
-                    pass
-                # elif line[0] in wyckoffs.split():
-                elif re.match('[a-z]', line[0]):
-                    if not first_dist:
-                        distortions.append(this_dist)
-                    wyck_lbl, point= line.split()[:2]
-                    proj_vecs = line.split()[2:]
-                    this_dist = (wyck_lbl, [to_array(point)], [[to_array(pv.rstrip(',')) for pv in proj_vecs]])
-                    first_dist = False
-                elif line == '*':
-                    distortions.append(this_dist)
-                else:
-                    point = line.split()[0]
-                    proj_vecs = line.split()[1:]
-                    this_dist[1].append(to_array(point))
-                    this_dist[2].append([to_array(pv.rstrip(',')) for pv in proj_vecs])
-            if len(distortions) == 0:
-                pass
-            else:
-                dists.append((s_op, distortions))
-    return dists
+#  def getSymOps(spacegroup, setting=None):
+#     values = {'parent': spacegroup}
+#     shows = ['elements']
+#     with IsotropySession(values, shows, setting=setting) as isos:
+#         lines = isos.getDisplayData('parent')
+#         symOps = []
+#         for line in lines:
+#             symOps += re.findall(r'\(([A-Za-z0-9]*)\|([0-9,/]*)\)', line)
+#     return symOps
+#
+#
+#  def getKpoints(spacegroup, setting=None):
+#     values = {'parent': spacegroup}
+#     shows = ['kpoint']
+#     with IsotropySession(values, shows, setting=setting) as isos:
+#         lines = isos.getDisplayData('kpoint')
+#         kpoints = []
+#         for line in lines:
+#             kpoints += re.findall(r'([A-Z][A-Z]?)\s*\((.*)\)', line)
+#         kpt_dict = {label: tuple([p for p in loc.split(',')])
+#                     for label, loc in kpoints}
+#     return kpt_dict
+#
+#
+#  def getIrreps(spacegroup, kpoint=None, setting=None):
+#     values = {'parent': spacegroup}
+#     if kpoint:
+#         values['kpoint'] = kpoint
+#     shows = ['irrep']
+#     with IsotropySession(values, shows, setting=setting) as isos:
+#         lines = isos.getDisplayData('irrep')
+#         irreps = []
+#         for line in lines:
+#             irreps += re.findall(r'^([A-Z].*)\n', line)
+#     return irreps
+#
+#
+#  def getRepresentations(spacegroup, kpoint_label, setting=None):
+#      elements = getSymOps(spacegroup, setting)
+#      irreps = getIrreps(spacegroup, kpoint_label, setting)
+#      values = {'parent': spacegroup, 'kpoint': kpoint_label}
+#      shows = ['matrix']
+#      irrep_dict = {}
+#      with IsotropySession(values, shows, setting=setting) as isos:
+#          for irrep in irreps:
+#              isos.values['irrep'] = irrep
+#              mat_list = []
+#              for element in elements:
+#                  elem_str = '{} {}'.format(element[0],
+#                                            element[1].replace(',', ' '))
+#                  isos.values['element'] = elem_str
+#                  lines = isos.getDisplayData('irrep')
+#                  logger.debug("lines: \n{}".format(lines))
+#                  temp_lines = []
+#                  temp_lines.append(re.match(r'\(.*\)\s*(.*)',
+#                                             lines[1]).groups()[0])
+#                  for line in lines[2:-1]:
+#                      temp_lines.append(re.match(r'\s*(.*)', line).groups()[0])
+#                  matrix = [[float(i) for i in r.split()]
+#                            for r in temp_lines if not r == '']
+#                  mat_list.append(matrix)
+#              irrep_dict[irrep] = mat_list
+#      return irrep_dict
+#
+#
+#  def getPossiblePhaseTransitions(struct_hs, struct_ls):
+#     """
+#     Given two pymatgen structure objects (high symmetry and low symmetry)
+#     find all irreps describing an order parameter of the phase transition between these structures
+#
+#     returns a 'phase transition' which is just a dict containing:
+#             'structure_high_sym'
+#             'structure_low_sym'
+#             'parent'
+#             'subgroup'
+#             'irrep'
+#             'direction'
+#             'basis'
+#             'origin'
+#             'secondary_OPs' - other order parameters which do not lower symmetry more than the primary OP
+#                               a dict of 'irrep', 'direction', 'domain', 'frequency'
+#     """
+#     sga_hs = SpacegroupAnalyzer(struct_hs)
+#     sga_ls = SpacegroupAnalyzer(struct_ls)
+#     struct_hs_p = sga_hs.get_primitive_standard_structure()
+#     struct_ls_p = sga_ls.get_primitive_standard_structure()
+#     sgn_hs = sga_hs.get_space_group_number()
+#     sgn_ls = sga_ls.get_space_group_number()
+#     # not limiting results by ratio since the size in isotropy doesn't account for changes of unit cell
+#     # seems like it might only allow for diagonal basis?? NO! even tutorial has examples with nondiagonal basis
+#     # ratio = len(struct_ls_p) / len(struct_hs_p)
+#     # if ratio % 1 != 0:
+#     #     raise ValueError(("Number of sites in low symmetry structure must be",
+#     #                       " an integer times the number of sites in high symmetry structure"))
+#     # ratio = int(ratio)
+#     # values = {'parent': sgn_hs, 'subgroup': sgn_ls, 'size': ratio}
+#     values = {'parent': sgn_hs, 'subgroup': sgn_ls}
+#     shows = ['irrep', 'direction', 'basis', 'origin']
+#     possible_transitions = []
+#     with IsotropySession(values, shows) as isos:
+#         lines = isos.getDisplayData('ISOTROPY')
+#         for line in lines[1:-1]:
+#             irrep, direction, basis, origin = line.split()[:4]
+#             this_transition = {'structure_high_sym': struct_hs_p,
+#                                'structure_low_sym': struct_ls_p,
+#                                'parent': sgn_hs,
+#                                'subgroup': sgn_ls,
+#                                'irrep': irrep,
+#                                'direction': direction,
+#                                'basis': to_array(basis),
+#                                'origin': to_array(origin)}
+#             isos.shows.clearAll()
+#             isos.shows.add('frequency direction')
+#             isos.values['irrep'] = irrep
+#             freq_output = isos.getDisplayData('ISOTROPY')
+#             del isos.values['irrep']
+#             raw_sec_ops = freq_output[1].split(',')
+#             sec_ops = []
+#             for sop in raw_sec_ops:
+#                 freq, s_irrep, raw_s_dir = sop.split()
+#                 freq = int(freq)
+#                 s_dir, s_domain = raw_s_dir.rstrip(')').split('(')
+#                 sec_ops.append({'irrep': s_irrep,
+#                                 'direction': s_dir,
+#                                 'frequency': freq,
+#                                 'domain': s_domain})
+#             this_transition['secondary_OPs'] = sec_ops
+#             possible_transitions.append(this_transition)
+#     return possible_transitions
+#
+#
+#  def getAllowedMicroDistortions(phase_transition):
+#      """
+#      Given a 'phase transition' (likely from the getPossiblePhaseTransitions function)
+#      find allowed displacive modes for all primary and secondary order parameters
+#
+#      returns a list where each element corresponds to an order parameter
+#      each element of this list is a tuple where the first element is a dict describing the order parameter
+#      and the second element is a list of modes
+#      each mode is a tuple of the form (wyckoff label, [points], [(displacement vectors)])
+#      the actual distortions can then by projected on to the displacement vectors to
+#      separate the contributions from each mode
+#      displacement vectors is a tuple since multidimensional irreps will have more than one at each point
+#      """
+#      sga_hs = SpacegroupAnalyzer(phase_transition['structure_high_sym'])
+#      wyckoffs = ' '.join(set(sga_hs.get_symmetry_dataset()['wyckoffs']))
+#      values = {'parent': phase_transition['parent'],
+#                'wyckoff': wyckoffs}
+#      shows = ['wyckoff', 'microscopic vector']
+#      dists = []
+#      with IsotropySession(values, shows) as isos:
+#          for s_op in phase_transition['secondary_OPs']:
+#              isos.values['irrep'] = s_op['irrep']
+#              isos.values['direction'] = s_op['direction']
+#              raw_dist_out = isos.getDisplayData('DISTORTION')
+#              distortions = []
+#              first_dist = True
+#              for line in raw_dist_out:
+#                  if re.match('.*Wyckoff Point.*', line) or re.match(r'\*\*+', line) or line == '':
+#                      pass
+#                  # elif line[0] in wyckoffs.split():
+#                  elif re.match('[a-z]', line[0]):
+#                      if not first_dist:
+#                          distortions.append(this_dist)
+#                      wyck_lbl, point= line.split()[:2]
+#                      proj_vecs = line.split()[2:]
+#                      this_dist = (wyck_lbl, [to_array(point)], [[to_array(pv.rstrip(',')) for pv in proj_vecs]])
+#                      first_dist = False
+#                  elif line == '*':
+#                      distortions.append(this_dist)
+#                  else:
+#                      point = line.split()[0]
+#                      proj_vecs = line.split()[1:]
+#                      this_dist[1].append(to_array(point))
+#                      this_dist[2].append([to_array(pv.rstrip(',')) for pv in proj_vecs])
+#              if len(distortions) == 0:
+#                  pass
+#              else:
+#                  dists.append((s_op, distortions))
+#      return dists
 
 
 def to_array(ar_str):
