@@ -267,7 +267,10 @@ def detect_column_indexes(list_of_lines):
     transitions = [col.count(' ') == len(list_of_lines) for col in zip(*list_of_lines)]
     last = False
     for i, x in enumerate(transitions):
-        if not x and last and list_of_lines[0][i] != ' ':
+        if (not x
+            and last
+            and list_of_lines[0][i] != ' '
+            and all(line[i] != ' ' for line in list_of_lines[1:])):
             indexes.append(i)
         last = x
     return indexes
