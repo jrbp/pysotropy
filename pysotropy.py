@@ -243,7 +243,9 @@ def detect_data_form_and_convert(prop):
     # we leave numbers as strings for ease of giving them
     # back to isotropy (which often wants fractions)
     # they can be converted where needed
-    return prop
+
+    # finally just remove outer whitespace
+    return prop.strip()
 
 def detect_multirows_and_split(split_lines):
     result_list = []
@@ -288,72 +290,51 @@ def split_line_by_indexes(indexes, line):
     return tokens
 
 
+def getSymOps(spacegroup, setting=None):
+    values = {'parent': spacegroup}
+    shows = ['elements']
+    with IsotropySession(values, shows, setting=setting) as isos:
+        symOps = isos.getDisplayData('parent')[0]['Elements']
+    return symOps
 
-#  def getSymOps(spacegroup, setting=None):
-#     values = {'parent': spacegroup}
-#     shows = ['elements']
-#     with IsotropySession(values, shows, setting=setting) as isos:
-#         lines = isos.getDisplayData('parent')
-#         symOps = []
-#         for line in lines:
-#             symOps += re.findall(r'\(([A-Za-z0-9]*)\|([0-9,/]*)\)', line)
-#     return symOps
-#
-#
-#  def getKpoints(spacegroup, setting=None):
-#     values = {'parent': spacegroup}
-#     shows = ['kpoint']
-#     with IsotropySession(values, shows, setting=setting) as isos:
-#         lines = isos.getDisplayData('kpoint')
-#         kpoints = []
-#         for line in lines:
-#             kpoints += re.findall(r'([A-Z][A-Z]?)\s*\((.*)\)', line)
-#         kpt_dict = {label: tuple([p for p in loc.split(',')])
-#                     for label, loc in kpoints}
-#     return kpt_dict
-#
-#
-#  def getIrreps(spacegroup, kpoint=None, setting=None):
-#     values = {'parent': spacegroup}
-#     if kpoint:
-#         values['kpoint'] = kpoint
-#     shows = ['irrep']
-#     with IsotropySession(values, shows, setting=setting) as isos:
-#         lines = isos.getDisplayData('irrep')
-#         irreps = []
-#         for line in lines:
-#             irreps += re.findall(r'^([A-Z].*)\n', line)
-#     return irreps
-#
-#
-#  def getRepresentations(spacegroup, kpoint_label, setting=None):
-#      elements = getSymOps(spacegroup, setting)
-#      irreps = getIrreps(spacegroup, kpoint_label, setting)
-#      values = {'parent': spacegroup, 'kpoint': kpoint_label}
-#      shows = ['matrix']
-#      irrep_dict = {}
-#      with IsotropySession(values, shows, setting=setting) as isos:
-#          for irrep in irreps:
-#              isos.values['irrep'] = irrep
-#              mat_list = []
-#              for element in elements:
-#                  elem_str = '{} {}'.format(element[0],
-#                                            element[1].replace(',', ' '))
-#                  isos.values['element'] = elem_str
-#                  lines = isos.getDisplayData('irrep')
-#                  logger.debug("lines: \n{}".format(lines))
-#                  temp_lines = []
-#                  temp_lines.append(re.match(r'\(.*\)\s*(.*)',
-#                                             lines[1]).groups()[0])
-#                  for line in lines[2:-1]:
-#                      temp_lines.append(re.match(r'\s*(.*)', line).groups()[0])
-#                  matrix = [[float(i) for i in r.split()]
-#                            for r in temp_lines if not r == '']
-#                  mat_list.append(matrix)
-#              irrep_dict[irrep] = mat_list
-#      return irrep_dict
-#
-#
+def getKpoints(spacegroup, setting=None):
+    values = {'parent': spacegroup}
+    shows = ['kpoint']
+    with IsotropySession(values, shows, setting=setting) as isos:
+        kpoints = isos.getDisplayData('kpoint')
+        kpt_dict = {kpt['']: tuple(kpt['k vector']) for kpt in kpoints}
+    return kpt_dict
+
+def getIrreps(spacegroup, kpoint=None, setting=None):
+    values = {'parent': spacegroup}
+    if kpoint:
+        values['kpoint'] = kpoint
+    shows = ['irrep']
+    with IsotropySession(values, shows, setting=setting) as isos:
+        results = isos.getDisplayData('irrep')
+        irreps = [ir['Irrep (ML)'] for ir in results]
+    return irreps
+
+def getRepresentations(spacegroup, kpoint_label, setting=None):
+    elements = getSymOps(spacegroup, setting)
+    irreps = getIrreps(spacegroup, kpoint_label, setting)
+    values = {'parent': spacegroup, 'kpoint': kpoint_label}
+    shows = ['matrix']
+    irrep_dict = {}
+    with IsotropySession(values, shows, setting=setting) as isos:
+        for irrep in irreps:
+            isos.values['irrep'] = irrep
+            mat_list = []
+            for element in elements:
+                elem_str = '{} {}'.format(element[0],
+                                          ' '.join(element[1]))
+                isos.values['element'] = elem_str
+                res = isos.getDisplayData('irrep')[0]
+                matrix = res['Matrix'] # unlike previous version leaving elements as strings
+                mat_list.append(matrix)
+            irrep_dict[irrep] = mat_list
+    return irrep_dict
+
 #  def getPossiblePhaseTransitions(struct_hs, struct_ls):
 #     """
 #     Given two pymatgen structure objects (high symmetry and low symmetry)
@@ -485,15 +466,17 @@ def to_array(ar_str):
 if __name__ == '__main__':
     import sys
     stream_handler = logging.StreamHandler()
-    if sys.argv[1] == 'd':
-        stream_handler.setLevel(logging.DEBUG)
+    # TODO: implement argparse if this is ever more than a library
+    if len(sys.argv) > 1:
+        if sys.argv[1] == 'd':
+            stream_handler.setLevel(logging.DEBUG)
     else:
         stream_handler.setLevel(logging.INFO)
     logger.addHandler(stream_handler)
 
-    spacegroup = 221
-    logger.info(getSymOps(spacegroup))
-    logger.info(getKpoints(spacegroup))
-    logger.info(getIrreps(spacegroup))
-    logger.info(getRepresentations(spacegroup,
-                             list(getKpoints(spacegroup).keys())[0]))
+    sg = 221
+    logger.info(getSymOps(sg))
+    logger.info(getKpoints(sg))
+    logger.info(getIrreps(sg))
+    logger.info(getRepresentations(sg,
+                                   list(getKpoints(sg).keys())[0]))
