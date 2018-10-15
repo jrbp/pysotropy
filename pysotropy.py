@@ -269,8 +269,13 @@ def detect_column_indexes(list_of_lines):
     for i, x in enumerate(transitions):
         if (not x
             and last
-            and list_of_lines[0][i] != ' '
-            and all(line[i] != ' ' for line in list_of_lines[1:])):
+            and list_of_lines[0][i] != ' '):
+            #and all(line[i] != ' ' for line in list_of_lines[1:])):
+            # the above commented condition breaks Matricies (where the actual matrix is indented past header)
+            # but fixes cases where both the header label has spaces and is longer than the actual data
+            # if this indentation only happens for matricies we can apply a fix to that special case
+            # example above condition is useful:
+            # shows = ['irrep', 'kpoint'], then getDisplayData('irrep')
             indexes.append(i)
         last = x
     return indexes
