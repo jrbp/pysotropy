@@ -175,7 +175,14 @@ class IsotropySession:
         self.iso_process.stdin.write(bytes(command + "\n", "ascii"))
         self.iso_process.stdin.flush()
 
-    def getDisplayData(self, display, parsed=False):
+    def getDisplayData(self, display, raw=False):
+        """
+        Args:
+        display: what we are asking isotropy to display
+            the command sent will be 'DISPLAY {display}'
+        raw: if true return a string of the raw output from isotropy
+            otherwise the output is automaticly parsed in to a list of dictionaries
+        """
         self.sendCommand("DISPLAY {}".format(display))
         lines = []
         keep_reading = True
@@ -192,7 +199,7 @@ class IsotropySession:
                 #self.read_iso_line() # read past Blank
             else:
                 lines.append(this_line)
-        if parsed:
+        if not raw:
             return self._parse_output(lines)
         return lines
 
@@ -205,9 +212,40 @@ class IsotropySession:
     def _parse_output(self, lines):
         indexes = detect_column_indexes(lines)
         split_by_ind = [split_line_by_indexes(indexes, line) for line in lines]
-        return detect_and_split_rows(split_by_ind)
+        parsed_output = [{key: detect_data_form_and_convert(prop)
+                          for key, prop in result.items()}
+                         for result in detect_multirows_and_split(split_by_ind)]
+        return parsed_output
 
-def detect_and_split_rows(split_lines):
+def detect_data_form_and_convert(prop):
+    # if it is a list operate on each element
+    if isinstance(prop, list):
+        return [detect_data_form_and_convert(p) for p in prop]
+    # first split by '|'s (but not '|'s inside paren)
+    pipe_split_list = re.split(r'[|]\s*(?![^()]*\))', prop)
+    if len(pipe_split_list) > 1:
+        return detect_data_form_and_convert(pipe_split_list)
+    # first split by commas (but not commas inside paren)
+    comma_split_list = re.split(r'[,]\s*(?![^()]*\))', prop)
+    if len(comma_split_list) > 1:
+        return detect_data_form_and_convert(comma_split_list)
+    # remove paren if entirely surrounded in paren with no inner paren
+    # return list of paren surrouned bits if there are multiple
+    if re.match(r'^\(.*\)$', prop):
+        surrounded_by_paren_list = re.findall(r'\((.+?)\)', prop)
+        if len(surrounded_by_paren_list) > 1:
+            return detect_data_form_and_convert(surrounded_by_paren_list)
+        return detect_data_form_and_convert(surrounded_by_paren_list[0])
+    # next split by spaces
+    space_split_list = prop.split()
+    if len(space_split_list) > 1:
+        return detect_data_form_and_convert(space_split_list)
+    # we leave numbers as strings for ease of giving them
+    # back to isotropy (which often wants fractions)
+    # they can be converted where needed
+    return prop
+
+def detect_multirows_and_split(split_lines):
     result_list = []
     for row in split_lines[1:]:
         if row[0]:
