@@ -263,7 +263,6 @@ def detect_multirows_and_split(split_lines):
                     result[split_lines[0][j]] = [result[split_lines[0][j]], prop]
     return result_list
 
-
 def detect_column_indexes(list_of_lines):
     indexes = [0]
     transitions = [col.count(' ') == len(list_of_lines) for col in zip(*list_of_lines)]
@@ -334,6 +333,23 @@ def getRepresentations(spacegroup, kpoint_label, setting=None):
                 mat_list.append(matrix)
             irrep_dict[irrep] = mat_list
     return irrep_dict
+
+def getDistortion(parent, wyckoffs, irrep, direction=None, cell=None):
+    values = {'parent': parent,
+              'wyckoff': ' '.join(wyckoffs),
+              'irrep': irrep,}
+    if direction:
+        values['direction'] = direction
+    if cell:
+        values['cell'] = ' '.join([','.join([str(i) for i in r]) for r in cell])
+    shows = ['wyckoff', 'microscopic vector']
+    with IsotropySession(values, shows) as isos:
+        dist = isos.getDisplayData('DISTORTION', raw=False)
+    # if there is one projected vector for each point we may want to
+    # change this so that it is a list of length 1 so data is in same
+    # form as cases where there are multiple vectors for each point
+    # this currently is not done
+    return dist
 
 #  def getPossiblePhaseTransitions(struct_hs, struct_ls):
 #     """
@@ -450,23 +466,23 @@ def getRepresentations(spacegroup, kpoint_label, setting=None):
 #              else:
 #                  dists.append((s_op, distortions))
 #      return dists
-
-
-def to_array(ar_str):
-    as_mat = [[mm
-               for mm in v.split(',')]
-              for v in ar_str.rstrip(')').lstrip('(').split('),(')]
-    if len(as_mat) == 1:
-        result = as_mat[0]
-    else:
-        result = as_mat
-    return result
+#
+#
+#def to_array(ar_str):
+#    as_mat = [[mm
+#               for mm in v.split(',')]
+#              for v in ar_str.rstrip(')').lstrip('(').split('),(')]
+#    if len(as_mat) == 1:
+#        result = as_mat[0]
+#    else:
+#        result = as_mat
+#    return result
 
 
 if __name__ == '__main__':
+    # implement argparse if this main part is ever for more than testing
     import sys
     stream_handler = logging.StreamHandler()
-    # TODO: implement argparse if this is ever more than a library
     if len(sys.argv) > 1:
         if sys.argv[1] == 'd':
             stream_handler.setLevel(logging.DEBUG)
@@ -480,3 +496,4 @@ if __name__ == '__main__':
     logger.info(getIrreps(sg))
     logger.info(getRepresentations(sg,
                                    list(getKpoints(sg).keys())[0]))
+    logger.info(getDistortion(sg, 'a b c', 'R4-'))
