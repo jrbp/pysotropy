@@ -3,9 +3,11 @@ import os
 import logging
 from collections import MutableMapping, MutableSet
 from subprocess import PIPE
-from sarge import Command, Capture
 import re
-from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+from fractions import Fraction
+import numpy as np
+from sarge import Command, Capture
+#from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 """
 Python interface to isotropy
 """
@@ -289,11 +291,16 @@ def split_line_by_indexes(indexes, line):
     return tokens
 
 
-def getSymOps(spacegroup, setting=None):
+def getSymOps(spacegroup, with_matrix=False, lattice_param='1 1 1 90 90 90', setting=None):
     values = {'parent': spacegroup}
     shows = ['elements']
     with IsotropySession(values, shows, setting=setting) as isos:
-        symOps = isos.getDisplayData('parent')[0]['Elements']
+        if with_matrix:
+            isos.values['lattice parameter'] = lattice_param
+            isos.shows.add('cartesian')
+            symOps = isos.getDisplayData('parent')
+        else:
+            symOps = isos.getDisplayData('parent')[0]['Elements']
     return symOps
 
 def getKpoints(spacegroup, setting=None):
@@ -314,9 +321,10 @@ def getIrreps(spacegroup, kpoint=None, setting=None):
         irreps = [ir['Irrep (ML)'] for ir in results]
     return irreps
 
-def getRepresentations(spacegroup, kpoint_label, setting=None):
+def getRepresentations(spacegroup, kpoint_label, irreps=None, setting=None):
     elements = getSymOps(spacegroup, setting)
-    irreps = getIrreps(spacegroup, kpoint_label, setting)
+    if not irreps:
+        irreps = getIrreps(spacegroup, kpoint_label, setting)
     values = {'parent': spacegroup, 'kpoint': kpoint_label}
     shows = ['matrix']
     irrep_dict = {}
@@ -341,7 +349,7 @@ def getDistortion(parent, wyckoffs, irrep, direction=None, cell=None):
     if direction:
         values['direction'] = direction
     if cell:
-        values['cell'] = ' '.join([','.join([str(i) for i in r]) for r in cell])
+        values['cell'] = _matrix_to_iso_string(cell)
     shows = ['wyckoff', 'microscopic vector']
     with IsotropySession(values, shows) as isos:
         dist = isos.getDisplayData('DISTORTION', raw=False)
@@ -350,6 +358,71 @@ def getDistortion(parent, wyckoffs, irrep, direction=None, cell=None):
     # form as cases where there are multiple vectors for each point
     # this currently is not done
     return dist
+
+def _matrix_to_iso_string(mat):
+    return ' '.join([','.join([str(i) for i in r]) for r in mat])
+
+def _to_float(number):
+    try:
+        return float(number)
+    except ValueError:
+        return float(Fraction(number))
+
+def _list_to_float_array(sl):
+    """return float array of (possibly nested) list of strings (or ints/floats) where
+    strings can have fractions (i.e. 1/2 will be converted to 0.5)"""
+    result = []
+    for i in sl:
+        if isinstance(i, (list, np.ndarray)):
+            result.append(_list_to_float_array(i))
+        else:
+            result.append(_to_float(i))
+    return np.array(result, dtype=float)
+
+
+def _find_all_equivalent_basis_origin(parent, basis, origin):
+    basis = _list_to_float_array(basis)
+    origin = _list_to_float_array(origin)
+    # we follow a convention that all origin choices are positive with each componenet < 1
+    origin = np.array([i % 1 for i in origin])
+    symOps = getSymOps(parent, with_matrix=True)
+    possible_basis_origins = []
+    for symop in symOps:
+        rot = _list_to_float_array(symop['Rotation matrix, translation'][:3])
+        trans = _list_to_float_array(symop['Rotation matrix, translation'][3])
+        new_basis = np.array([np.dot(rot, vec) + trans for vec in basis])
+        new_origin = np.dot(rot, origin) + trans
+        # we follow a convention that all origin choices are positive with each componenet < 1
+        new_origin = np.array([i % 1 for i in new_origin])
+        possible_basis_origins.append((new_basis, new_origin))
+    # commented line below would remove duplicates, but it might not be worth it
+    # no_dupes = list({np.array(bo[0] + bo[1]).tostring(): bo
+    #                      for bo in possible_basis_origins}.values())
+    return possible_basis_origins
+
+
+def getPossibleSingleIrrepOPs(parent, subgroup): #, basis=None, origin=None):
+    values = {'parent': parent, 'subgroup': subgroup}
+    shows = ['irrep', 'direction', 'basis', 'origin']
+    with IsotropySession(values, shows) as isos:
+        possible_ops = isos.getDisplayData('ISOTROPY')
+    return possible_ops
+
+def getPossibleOPs_for_basis(parent, subgroup, basis, origin):
+    ops_to_check = getPossibleSingleIrrepOPs(parent, subgroup)
+    # TODO: add coupled irreps to ops_to_check
+    equivalent_basis = _find_all_equivalent_basis_origin(parent, basis, origin)
+    compatible_ops = []
+    for op in ops_to_check:
+        this_basis = _list_to_float_array(op['Basis Vectors'])
+        this_origin = _list_to_float_array(op['Origin']) # assumed to have all 0<x_i<1 for each i
+        for b, o in equivalent_basis:
+            if (abs(this_basis - b) < 1e-5).all() and (abs(this_origin - o) < 1e-5).all():
+                compatible_ops.append(op)
+                break
+    return compatible_ops
+
+
 
 #  def getPossiblePhaseTransitions(struct_hs, struct_ls):
 #     """
@@ -491,9 +564,10 @@ if __name__ == '__main__':
     logger.addHandler(stream_handler)
 
     sg = 221
-    logger.info(getSymOps(sg))
-    logger.info(getKpoints(sg))
-    logger.info(getIrreps(sg))
-    logger.info(getRepresentations(sg,
-                                   list(getKpoints(sg).keys())[0]))
-    logger.info(getDistortion(sg, 'a b c', 'R4-'))
+    logger.info(getSymOps(sg, with_matrix=True))
+    #logger.info(getKpoints(sg))
+    #logger.info(getIrreps(sg))
+    #logger.info(getRepresentations(sg,
+    #                               list(getKpoints(sg).keys())[0],
+    #                               irreps=['GM5+']))
+    #logger.info(getDistortion(sg, 'a b c', 'R4-'))
