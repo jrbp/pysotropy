@@ -1,6 +1,10 @@
 #!/bin/env python3
+"""
+Python interface to isotropy
+"""
 import os
 import logging
+from itertools import permutations, combinations
 from collections import MutableMapping, MutableSet
 from subprocess import PIPE
 import re
@@ -8,9 +12,6 @@ from fractions import Fraction
 import numpy as np
 from sarge import Command, Capture
 #from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-"""
-Python interface to isotropy
-"""
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -174,6 +175,7 @@ class IsotropySession:
         # read the '*' that indicates the prompt so they don't build up
         this_line = self.read_iso_line()
         # logger.debug("reading *: {}".format(this_line))
+        logger.debug(f'python: {command}')
         self.iso_process.stdin.write(bytes(command + "\n", "ascii"))
         self.iso_process.stdin.flush()
 
@@ -360,7 +362,7 @@ def getDistortion(parent, wyckoffs, irrep, direction=None, cell=None):
     return dist
 
 def _matrix_to_iso_string(mat):
-    return ' '.join([','.join([str(i) for i in r]) for r in mat])
+    return ' '.join([','.join([str(Fraction(i)) for i in r]) for r in mat])
 
 def _to_float(number):
     try:
@@ -378,7 +380,6 @@ def _list_to_float_array(sl):
         else:
             result.append(_to_float(i))
     return np.array(result, dtype=float)
-
 
 def _find_all_equivalent_basis_origin(parent, basis, origin):
     basis = _list_to_float_array(basis)
@@ -400,24 +401,49 @@ def _find_all_equivalent_basis_origin(parent, basis, origin):
     #                      for bo in possible_basis_origins}.values())
     return possible_basis_origins
 
-
-def getPossibleSingleIrrepOPs(parent, subgroup): #, basis=None, origin=None):
+def getPossibleSingleIrrepOPs(parent, subgroup):
     values = {'parent': parent, 'subgroup': subgroup}
     shows = ['irrep', 'direction', 'basis', 'origin']
     with IsotropySession(values, shows) as isos:
         possible_ops = isos.getDisplayData('ISOTROPY')
     return possible_ops
 
-def getPossibleOPs_for_basis(parent, subgroup, basis, origin):
-    ops_to_check = getPossibleSingleIrrepOPs(parent, subgroup)
-    # TODO: add coupled irreps to ops_to_check
+def getPossibleIrrepComboOPs(parent, subgroup=None, irreps=None, n=2):
+    if irreps is None: # try all irreps, really slow
+        irreps = getIrreps(parent)
+    possible_ops = []
+    values = {'parent': parent}
+    if subgroup is not None:
+        values['subgroup'] = subgroup
+    shows = ['irrep', 'direction', 'basis', 'origin']
+    with IsotropySession(values, shows) as isos:
+        for combo in combinations(irreps, n):
+            logger.debug(f'trying irrep combo {combo}')
+            isos.values['irrep'] = ' '.join(combo)
+            possible_ops.extend(isos.getDisplayData('ISOTROPY COUPLED'))
+    return possible_ops
+
+def _in_basis_permutations(basis_a, basis_b):
+    for b in permutations(basis_a):
+        if (abs(basis_b - b) < 1e-5).all():
+            return True
+    return False
+
+def getPossibleOPs_for_basis(parent, subgroup, basis, origin, coupled_order=2):
+    single_ops = getPossibleSingleIrrepOPs(parent, subgroup)
+    logger.debug('getting coupled irreps')
+    coupled_ops = getPossibleIrrepComboOPs(parent,
+                                           subgroup=subgroup,
+                                           #irreps=[ir['Irrep'] for ir in ...]
+                                           n=coupled_order)
+    ops_to_check = single_ops + coupled_ops
     equivalent_basis = _find_all_equivalent_basis_origin(parent, basis, origin)
     compatible_ops = []
     for op in ops_to_check:
         this_basis = _list_to_float_array(op['Basis Vectors'])
         this_origin = _list_to_float_array(op['Origin']) # assumed to have all 0<x_i<1 for each i
         for b, o in equivalent_basis:
-            if (abs(this_basis - b) < 1e-5).all() and (abs(this_origin - o) < 1e-5).all():
+            if (abs(this_origin - o) < 1e-5).all() and _in_basis_permutations(b, this_basis):
                 compatible_ops.append(op)
                 break
     return compatible_ops
