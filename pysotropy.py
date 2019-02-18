@@ -319,6 +319,13 @@ def getKpoints(spacegroup, setting=None):
         kpt_dict = {kpt['']: tuple(kpt['k vector']) for kpt in kpoints}
     return kpt_dict
 
+def _kpt_has_params(kpt):
+    try:
+        _list_to_float_array(kpt)
+    except ValueError:
+        return True
+    return False
+
 def getIrreps(spacegroup, kpoint=None, setting=None):
     values = {'parent': spacegroup}
     if kpoint:
@@ -415,8 +422,13 @@ def getPossibleSingleIrrepOPs(parent, subgroup):
     return possible_ops
 
 def getPossibleIrrepComboOPs(parent, subgroup=None, irreps=None, n=2):
-    if irreps is None: # try all irreps, really slow
-        irreps = getIrreps(parent)
+    if irreps is None:
+        # try all irreps that don't have kpt with free parameter
+        kpts = getKpoints(parent)
+        irreps = []
+        for kpt, vec in kpts.items():
+            if not _kpt_has_params(vec):
+                irreps += getIrreps(parent, kpoint=kpt)
     possible_ops = []
     values = {'parent': parent}
     if subgroup is not None:
