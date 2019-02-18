@@ -16,6 +16,10 @@ from sarge import Command, Capture
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+class IsotropyBombedException(Exception):
+    """Raised when Isotropy Bombs"""
+    pass
+
 class Shows(MutableSet):
     def __init__(self, parent, initial_shows):
         self._shows = set()
@@ -210,6 +214,8 @@ class IsotropySession:
     def read_iso_line(self):
         raw = self.iso_process.stdout.readline().decode()
         this_line = raw.rstrip('\n')
+        if re.match('.*program\shas\sbombed.*', this_line):
+            raise IsotropyBombedException()
         logger.debug("isotropy: {}".format(this_line))
         return this_line
 
