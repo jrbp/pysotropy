@@ -460,7 +460,7 @@ def getPossibleIrrepComboOPs(parent, subgroup=None, irreps=None, n=2):
     shows = ['irrep', 'direction', 'basis', 'origin']
     with IsotropySession(values, shows) as isos:
         for combo in combinations(irreps, n):
-            logger.debug(f'trying irrep combo {combo}')
+            logger.info(f'trying irrep combo {combo}')
             isos.values['irrep'] = ' '.join(combo)
             possible_ops.extend(isos.getDisplayData('ISOTROPY COUPLED'))
     return possible_ops
