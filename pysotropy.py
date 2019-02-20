@@ -469,6 +469,8 @@ def getPossibleIrrepComboOPs(parent, subgroup=None, irreps=None, n=2):
                                "restarting session and trying again (likely too many iso files)")
                 isos.restart_session()
                 this_combo_data = isos.getDisplayData('ISOTROPY COUPLED')
+            for op in this_combo_data:
+                op["Irreps"] = combo
             logger.debug("parsed: {}".format(this_combo_data))
             possible_ops.extend(this_combo_data)
     return possible_ops
