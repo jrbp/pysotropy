@@ -238,9 +238,9 @@ class IsotropySession:
     def read_iso_line(self):
         raw = self.iso_process.stdout.readline().decode()
         this_line = raw.rstrip('\n')
+        logger.debug("isotropy: {}".format(this_line))
         if re.match('.*program\shas\sbombed.*', this_line):
             raise IsotropyBombedException()
-        logger.debug("isotropy: {}".format(this_line))
         return this_line
 
     def _parse_output(self, lines):
