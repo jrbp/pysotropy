@@ -489,15 +489,19 @@ def getPossibleOPs_for_basis(parent, subgroup, basis, origin, coupled_order=2):
                                            #irreps=[ir['Irrep'] for ir in ...]
                                            n=coupled_order)
     ops_to_check = single_ops + coupled_ops
-    equivalent_basis = _find_all_equivalent_basis_origin(parent, basis, origin)
+    #equivalent_basis = _find_all_equivalent_basis_origin(parent, basis, origin)
     compatible_ops = []
     for op in ops_to_check:
         this_basis = _list_to_float_array(op['Basis Vectors'])
         this_origin = _list_to_float_array(op['Origin']) # assumed to have all 0<x_i<1 for each i
-        for b, o in equivalent_basis:
-            if (abs(this_origin - o) < 1e-5).all() and _in_basis_permutations(b, this_basis):
-                compatible_ops.append(op)
-                break
+        if (abs(this_origin - basis[1]) < 1e-5).all() and _in_basis_permutations(basis[0],
+                                                                                 this_basis):
+            compatible_ops.append(op)
+        #
+        # for b, o in equivalent_basis:
+        #     if (abs(this_origin - o) < 1e-5).all() and _in_basis_permutations(b, this_basis):
+        #         compatible_ops.append(op)
+        #         break
     return compatible_ops
 
 
