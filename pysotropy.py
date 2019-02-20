@@ -218,8 +218,17 @@ class IsotropySession:
                 self.read_iso_line() # read past Enter RETURN
                 self.sendCommand("")
                 self.read_iso_line() # read past Adding
-                self.read_iso_line() # read past Blank
-                #self.read_iso_line() # read past Blank
+                # self.read_iso_line() # read past Blank
+                # self.read_iso_line() # read past Blank is this one inconsistent?
+                for i in range(10):
+                    possibly_blank = self.read_iso_line()
+                    if not (possibly_blank in ['*', '']):  # if there is no output '' is returned above
+                        logger.debug("moved past data base prompt, adding results")
+                        lines.append(possibly_blank)
+                        break
+                    else:
+                        if i == 9:
+                            logger.debug("moved past data base prompt, no results")
             else:
                 lines.append(this_line)
         if not raw:
