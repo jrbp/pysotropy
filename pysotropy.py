@@ -146,10 +146,11 @@ class IsotropySession:
         # move past initial output
         keep_reading = True
         while keep_reading:
-            this_line = self.iso_process.stdout.readline().decode()
+            # this_line = self.iso_process.stdout.readline().decode()
+            this_line = self.read_iso_line()
             if this_line: # don't log until isotropy responds
                 logger.debug("isotropy: {}".format(this_line))
-            if this_line == 'Use "VALUE IRREP VERSION" to change version\n':
+            if this_line == 'Use "VALUE IRREP VERSION" to change version':
                 keep_reading = False
 
         self.screen = 999  # exploit this too make parsing output easier?
