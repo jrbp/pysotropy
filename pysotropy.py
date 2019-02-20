@@ -8,6 +8,7 @@ from itertools import permutations, combinations
 from collections import MutableMapping, MutableSet
 from subprocess import PIPE
 import re
+from glob import glob
 from fractions import Fraction
 import numpy as np
 from sarge import Command, Capture
@@ -175,6 +176,19 @@ class IsotropySession:
 
     def __exit__(self, exec_type, exc_value, exc_traceback):
         self.sendCommand("QUIT")
+
+    def restart_session(self):
+        try:
+            self.sendCommand("QUIT")
+        except BrokenPipeError:
+            logger.debug('Ignoring BrokenPipeError on restart')
+        self.iso_process.kill()
+        files_to_remove = glob("*.iso")
+        logger.warning("removing iso db files {}".format(files_to_remove))
+        for f in files_to_remove:
+            os.remove(f)
+        self.__init__(values=self.values, shows=self.shows,
+                      labels=None, setting=self.setting) # TODO: update if labels implemented
 
     def sendCommand(self, command):
         # read the '*' that indicates the prompt so they don't build up
