@@ -462,7 +462,15 @@ def getPossibleIrrepComboOPs(parent, subgroup=None, irreps=None, n=2):
         for combo in combinations(irreps, n):
             logger.info(f'trying irrep combo {combo}')
             isos.values['irrep'] = ' '.join(combo)
-            possible_ops.extend(isos.getDisplayData('ISOTROPY COUPLED'))
+            try:
+                this_combo_data = isos.getDisplayData('ISOTROPY COUPLED')
+            except IsotropyBombedException:
+                logger.warning("Isotropy Bombed, "
+                               "restarting session and trying again (likely too many iso files)")
+                isos.restart_session()
+                this_combo_data = isos.getDisplayData('ISOTROPY COUPLED')
+            logger.debug("parsed: {}".format(this_combo_data))
+            possible_ops.extend(this_combo_data)
     return possible_ops
 
 def _in_basis_permutations(basis_a, basis_b):
