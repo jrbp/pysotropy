@@ -360,6 +360,15 @@ def getIrreps(spacegroup, kpoint=None, setting=None):
         irreps = [ir['Irrep (ML)'] for ir in results]
     return irreps
 
+def getIrrepDirections(spacegroup, irrep, setting=None):
+    # TODO: add option to get vectors
+    values = {'parent': spacegroup, 'irrep': irrep}
+    shows = ['direction']
+    with IsotropySession(values, shows, setting) as isos:
+        results = isos.getDisplayData('isotropy')
+        directions = [d['Dir'] for d in results]
+    return directions
+
 def getRepresentations(spacegroup, kpoint_label, irreps=None, setting=None):
     elements = getSymOps(spacegroup, setting)
     if not irreps:
