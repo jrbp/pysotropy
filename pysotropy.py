@@ -368,13 +368,26 @@ def getIrreps(spacegroup, kpoint=None, setting=None):
         irreps = [ir['Irrep (ML)'] for ir in results]
     return irreps
 
-def getIrrepDirections(spacegroup, irrep, setting=None):
-    # TODO: add option to get vectors
-    values = {'parent': spacegroup, 'irrep': irrep}
-    shows = ['direction']
-    with IsotropySession(values, shows, setting) as isos:
-        results = isos.getDisplayData('isotropy')
-        directions = [d['Dir'] for d in results]
+# def getIrrepDirections(spacegroup, irrep, setting=None, vector=False):
+#     # TODO: add option to get vectors
+#     values = {'parent': spacegroup, 'irrep': irrep}
+#     if vector:
+#         shows = ['direction']
+#     else:
+#         shows = ['direction']
+#     with IsotropySession(values, shows, setting) as isos:
+#         results = isos.getDisplayData('isotropy')
+#         directions = [d['Dir'] for d in results]
+#     return directions
+
+def getDirections(spacegroup, basis, origin, subgroup=1, setting=None):
+    values = {'parent': spacegroup,
+              'subgroup': subgroup,
+              'basis': _matrix_to_iso_string(basis),
+              'origin': ','.join([str(Fraction(i).limit_denominator(1000)) for i in origin])}
+    shows = ['kpoint']
+    with IsotropySession(values, shows, setting=setting) as isos:
+        directions = isos.getDisplayData('DIRECTION')
     return directions
 
 def getRepresentations(spacegroup, kpoint_label, irreps=None, setting=None):
