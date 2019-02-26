@@ -21,6 +21,12 @@ class IsotropyBombedException(Exception):
     """Raised when Isotropy Bombs"""
     pass
 
+
+class IsotropyBasisException(Exception):
+    """Raised when Isotropy Bombs"""
+    pass
+
+
 class Shows(MutableSet):
     def __init__(self, parent, initial_shows):
         self._shows = set()
@@ -241,6 +247,8 @@ class IsotropySession:
         logger.debug("isotropy: {}".format(this_line))
         if re.match('.*program\shas\sbombed.*', this_line):
             raise IsotropyBombedException()
+        if re.match(".*Basis\svectors\sare\snot\sa\sright\-handed\sset.*", this_line):
+            raise IsotropyBasisException()
         return this_line
 
     def _parse_output(self, lines):
