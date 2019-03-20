@@ -391,7 +391,7 @@ def getDirections(spacegroup, basis, origin, subgroup=1, setting=None):
     values = {'parent': spacegroup,
               'subgroup': subgroup,
               'basis': _matrix_to_iso_string(basis),
-              'origin': ','.join([str(Fraction(i).limit_denominator(1000)) for i in origin])}
+              'origin': ','.join([str(Fraction(i).limit_denominator(10)) for i in origin])}
     shows = ['kpoint']
     with IsotropySession(values, shows, setting=setting) as isos:
         directions = isos.getDisplayData('DIRECTION')
@@ -418,14 +418,16 @@ def getRepresentations(spacegroup, kpoint_label, irreps=None, setting=None):
             irrep_dict[irrep] = mat_list
     return irrep_dict
 
-def getDistortion(parent, wyckoffs, irrep, direction=None, cell=None):
+def getDistortion(parent, wyckoffs, irrep, direction=None, cell=None, origin=None):
     values = {'parent': parent,
               'wyckoff': ' '.join(wyckoffs),
               'irrep': irrep,}
-    if direction:
+    if direction is not None:
         values['direction'] = direction
-    if cell:
+    if cell is not None:
         values['cell'] = _matrix_to_iso_string(cell)
+    # if origin is not None:
+    #     values['origin'] = ','.join([str(Fraction(i)) for i in origin])
     shows = ['wyckoff', 'microscopic vector']
     with IsotropySession(values, shows) as isos:
         dist = isos.getDisplayData('DISTORTION', raw=False)
