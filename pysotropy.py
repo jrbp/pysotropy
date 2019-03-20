@@ -23,7 +23,12 @@ class IsotropyBombedException(Exception):
 
 
 class IsotropyBasisException(Exception):
-    """Raised when Isotropy Bombs"""
+    """Raised when isotropy doen't like the basis (not right handed)"""
+    pass
+
+class IsotropySubgroupException(Exception):
+    """Raised when Isotropy thinks there is no group-subgroup relation,
+       often due to an error (on isotropy's end) regarding basis"""
     pass
 
 
@@ -249,6 +254,8 @@ class IsotropySession:
             raise IsotropyBombedException()
         if re.match(".*Basis\svectors\sare\snot\sa\sright\-handed\sset.*", this_line):
             raise IsotropyBasisException()
+        if re.match(".*not\sall\selements\sof\sthe\ssubgroup\sare\selements\sof\sparent\sgroup.*", this_line):
+            raise IsotropySubgroupException()
         return this_line
 
     def _parse_output(self, lines):
@@ -258,6 +265,7 @@ class IsotropySession:
                           for key, prop in result.items()}
                          for result in detect_multirows_and_split(split_by_ind)]
         return parsed_output
+
 
 def detect_data_form_and_convert(prop):
     # if it is a list operate on each element
@@ -329,7 +337,6 @@ def split_line_by_indexes(indexes, line):
         tokens.append(line[i1:i2].rstrip())
     tokens.append(line[indexes[-1]:].rstrip())
     return tokens
-
 
 def getSymOps(spacegroup, with_matrix=False, lattice_param='1 1 1 90 90 90', setting=None):
     values = {'parent': spacegroup}
