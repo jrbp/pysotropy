@@ -497,6 +497,7 @@ def getPossibleIrrepComboOPs(parent, subgroup=None, irreps=None, n=2):
     if subgroup is not None:
         values['subgroup'] = subgroup
     shows = ['irrep', 'direction', 'basis', 'origin']
+    # last_combo = None
     with IsotropySession(values, shows) as isos:
         for combo in combinations(irreps, n):
             logger.info(f'trying irrep combo {combo}')
@@ -508,10 +509,34 @@ def getPossibleIrrepComboOPs(parent, subgroup=None, irreps=None, n=2):
                                "restarting session and trying again (likely too many iso files)")
                 isos.restart_session()
                 this_combo_data = isos.getDisplayData('ISOTROPY COUPLED')
+            # shouldn't need the following since we sorted out the inconsitent line(s) in getDisplayData
+            # though it is safer I suppose if this is here and will point to the right type of error
+            # if we do find that the following is needed should be sure to add removal of bad entry
+            # try: # only testing first one
+            #     if len(this_combo_data) > 0:
+            #         bs = this_combo_data[0]["Basis Vectors"]
+            #         dr = this_combo_data[0]["Dir"]
+            #         ip = this_combo_data[0]["Irrep (ML)"]
+            #         og = this_combo_data[0]["Origin"]
+            # except KeyError:
+            #     logger.warning("combo {} didn't parse correctly, trying again".format(combo))
+            #     logger.warning("possibly an error with last combo {}, retrying both".format(last_combo))
+            #     logger.warning("failed combo parsing data:\n{}".format(this_combo_data))
+
+            #     isos.values['irrep'] = ' '.join(last_combo)
+            #     isos.restart_session()
+            #     last_combo_data = isos.getDisplayData('ISOTROPY COUPLED')
+            #     logger.warning("last combo reparsed data:\n{}".format(last_combo_data))
+            #     possible_ops.extend(last_combo_data)
+            #     # STILL NEED TO REMOVE BAD ENTRY?
+            #     isos.values['irrep'] = ' '.join(combo)
+            #     this_combo_data = isos.getDisplayData('ISOTROPY COUPLED')
+            #     logger.warning("this combo reparsed data:\n{}".format(this_combo_data))
             for op in this_combo_data:
                 op["Irreps"] = combo
             logger.debug("parsed: {}".format(this_combo_data))
             possible_ops.extend(this_combo_data)
+            # last_combo = combo
     return possible_ops
 
 def _in_basis_permutations(basis_a, basis_b):
