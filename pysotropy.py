@@ -482,6 +482,7 @@ def getPossibleSingleIrrepOPs(parent, subgroup):
     shows = ['irrep', 'direction', 'basis', 'origin']
     with IsotropySession(values, shows) as isos:
         possible_ops = isos.getDisplayData('ISOTROPY')
+        # TODO: cleanup the (ML) for consistency
     return possible_ops
 
 def getPossibleIrrepComboOPs(parent, subgroup=None, irreps=None, n=2):
