@@ -58,7 +58,7 @@ def get_all_distortions(sgn_hs, wyckoff_list, directions, basis, origin):
         if iso._kpt_has_params(direct['k vector']):
             print("low sym kpoint not implemented yet skipping")
             print(direct)
-            # this can be easily implented by setting kvalue correctly using the value by getDirections
+            #TODO: this can be easily implented by setting kvalue correctly using the value by getDirections
             continue
         irrep = direct['Irrep']
         d = "vector,{}".format(','.join(direct['Dir']))
@@ -148,42 +148,51 @@ def get_distortion_dec_struct(wycks, struct_to_match, high_sym_wyckoff, struct_h
     return dist_struct_matched, mapping
 
 def get_projection_data(displacements, wycks, struct_hs_supercell, high_sym_wyckoff, struct_hs):
-    num_proj_vecs = len(wycks[0]["Projected Vectors"][0])
-    amplitudes = [0. for i in range(num_proj_vecs)]
-    amplitudes_as = [0. for i in range(num_proj_vecs)]
-    dist_struct_matched, mapping = get_distortion_dec_struct(wycks, struct_hs_supercell, high_sym_wyckoff, struct_hs)
-    dist_defs = dist_struct_matched
-    full_projvecs = []
-    for i, j in enumerate(mapping):
-        if j is not None:
-            pv = dist_struct_matched[j].properties["projvecs"]
-            full_projvecs.append(pv)
-        else:
-            full_projvecs.append([[0., 0., 0.] for i in range(num_proj_vecs)])
-    for i in range(num_proj_vecs):
-        sum_cart_squares = 0.
-        for pv in full_projvecs:
-            pv_cart = struct_hs_supercell.lattice.get_cartesian_coords(pv[i])
-            sum_cart_squares += pv_cart.dot(pv_cart)
-        norm_factor = sum_cart_squares**(-1/2)
-        # norm_factor = (np.sqrt(np.sum([struct_hs_supercell.lattice.get_cartesian_coords(pv[i]).dot(struct_hs_supercell.lattice.get_cartesian_coords(pv[i]))
-        #                                for pv in full_projvecs])))**-1
-        for disp, pv in zip(displacements, full_projvecs):
-            amplitudes[i] += np.dot(disp, pv[i])
+    results_by_wyck = {}
+    for n, wyck in enumerate(wycks):
+        num_proj_vecs = len(wycks[0]["Projected Vectors"][0])
+        amplitudes = [0. for i in range(num_proj_vecs)]
+        amplitudes_as = [0. for i in range(num_proj_vecs)]
+        dist_struct_matched, mapping = get_distortion_dec_struct([wyck], struct_hs_supercell, high_sym_wyckoff, struct_hs)
+        dist_defs = dist_struct_matched
+        full_projvecs = []
+        for i, j in enumerate(mapping):
+            if j is not None:
+                pv = dist_struct_matched[j].properties["projvecs"]
+                full_projvecs.append(pv)
+            else:
+                full_projvecs.append([[0., 0., 0.] for i in range(num_proj_vecs)])
+        for i in range(num_proj_vecs):
+            sum_cart_squares = 0.
+            for pv in full_projvecs:
+                pv_cart = struct_hs_supercell.lattice.get_cartesian_coords(pv[i])
+                sum_cart_squares += pv_cart.dot(pv_cart)
+            norm_factor = sum_cart_squares**(-1/2)
+            # norm_factor = (np.sqrt(np.sum([struct_hs_supercell.lattice.get_cartesian_coords(pv[i]).dot(struct_hs_supercell.lattice.get_cartesian_coords(pv[i]))
+            #                                for pv in full_projvecs])))**-1
+            for disp, pv in zip(displacements, full_projvecs):
+                amplitudes[i] += np.dot(disp, pv[i])
 
-            pv_np = norm_factor * np.array(pv[i], dtype=float)
-            proj_disp_cart = struct_hs_supercell.lattice.get_cartesian_coords(np.dot(disp, pv_np) * pv_np)
-            # print("displacement:\t{}".format(disp))
-            # print("projvec:\t{}".format(pv_np))
-            # print("pv_norm:\t{}".format(norm_factor))
-            # print("proj_disp_cart:\t{}".format(proj_disp_cart))
-            # print("distance:\t{}".format(proj_disp_cart.dot(proj_disp_cart)))
-            # print()
-            # amplitudes_as[i] += norm_factor * proj_disp_cart.dot(proj_disp_cart)
-            amplitudes_as[i] += proj_disp_cart.dot(proj_disp_cart)
-        amplitudes_as[i] += np.sqrt(amplitudes_as[i])
-
-    return amplitudes_as, amplitudes, dist_defs, full_projvecs, num_proj_vecs
+                pv_np = norm_factor * np.array(pv[i], dtype=float)
+                proj_disp_cart = struct_hs_supercell.lattice.get_cartesian_coords(np.dot(disp, pv_np) * pv_np)
+                # print("displacement:\t{}".format(disp))
+                # print("projvec:\t{}".format(pv_np))
+                # print("pv_norm:\t{}".format(norm_factor))
+                # print("proj_disp_cart:\t{}".format(proj_disp_cart))
+                # print("distance:\t{}".format(proj_disp_cart.dot(proj_disp_cart)))
+                # print()
+                # amplitudes_as[i] += norm_factor * proj_disp_cart.dot(proj_disp_cart)
+                amplitudes_as[i] += proj_disp_cart.dot(proj_disp_cart)
+            amplitudes_as[i] += np.sqrt(amplitudes_as[i])
+        results_by_wyck['{}{}'.format(wyck['Wyckoff'], n)] = {
+            'amplitudes_as': amplitudes_as,
+            'amplitudes': amplitudes,
+            'dist_defs': dist_defs,
+            'full_projvecs': full_projvecs,
+            'num_proj_vecs': num_proj_vecs,
+            'total_amplitude': np.sqrt(np.sum([a**2
+                                               for a in amplitudes]))}
+    return results_by_wyck
 
 def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False):
     # in general need to use value wyckoff xyz if there are free parameters
@@ -232,20 +241,23 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False):
 
     mode_decomposition_data = {}
     for irrep, wycks in all_in_sc_basis.items():
-        (amplitudes_as, amplitudes, dist_defs,
-         full_projvecs, num_proj_vecs) = get_projection_data(displacements, wycks,
-                                                             struct_hs_supercell, wyckoff_list, struct_hs)
-        mode_decomposition_data[irrep] = {}
-        irrep_dist_full_pvecs[irrep] = full_projvecs
-        mode_decomposition_data[irrep]["Full ProjVecs"] = full_projvecs
-        irrep_dist_defs[irrep] = dist_defs
-        mode_decomposition_data[irrep]["Distortion Defs"] = dist_defs.as_dict()
-        irrep_amplitudes[irrep] = amplitudes
-        mode_decomposition_data[irrep]["Amplitudes_as"] = amplitudes_as
-        mode_decomposition_data[irrep]["Amplitudes"] = amplitudes
-        mode_decomposition_data[irrep]["Direction"] = directions_dict[irrep]
-        mode_decomposition_data[irrep]["total_amplitude"] = np.sqrt(np.sum([a**2
-                                                                            for a in amplitudes]))
+        #(amplitudes_as, amplitudes, dist_defs,
+        # full_projvecs, num_proj_vecs) = get_projection_data(displacements, wycks,
+        #                                                     struct_hs_supercell, wyckoff_list, struct_hs)
+        proj_data_by_wyck = get_projection_data(displacements, wycks,
+                                                struct_hs_supercell, wyckoff_list, struct_hs)
+        for wyck in proj_data_by_wyck.keys():
+            proj_data_by_wyck[wyck]['direction'] = directions_dict[irrep]
+        mode_decomposition_data[irrep] = proj_data_by_wyck
+        #irrep_dist_full_pvecs[irrep] = full_projvecs
+        #mode_decomposition_data[irrep]["Full ProjVecs"] = full_projvecs
+        #irrep_dist_defs[irrep] = dist_defs
+        #mode_decomposition_data[irrep]["Distortion Defs"] = dist_defs.as_dict()
+        #irrep_amplitudes[irrep] = amplitudes
+        #mode_decomposition_data[irrep]["Amplitudes_as"] = amplitudes_as
+        #mode_decomposition_data[irrep]["Amplitudes"] = amplitudes
+        #mode_decomposition_data[irrep]["Direction"] = directions_dict[irrep]
+        #mode_decomposition_data[irrep]["total_amplitude"] = np.sqrt(np.sum([a**2 for a in amplitudes]))
         # print("TESTING:")
         # print(num_proj_vecs)
         # print()
@@ -257,26 +269,40 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False):
         # print()
         # print()
     if nonzero_only:
-        return {k:v for k,v in mode_decomposition_data.items()
-                if np.sum(np.abs(v['Amplitudes'])) > 1e-5}
+        nonzero_mode_decomp = {}
+        for irrep, wycks in mode_decomposition_data.items():
+            tot_amp = 0.
+            for wyck, data in wycks.items():
+                 tot_amp += np.sum(np.abs(data['amplitudes']))
+            if tot_amp > 1e-5:
+                nonzero_mode_decomp[irrep] = wycks
+        return nonzero_mode_decomp
+
+        # return {k:v for k,v in mode_decomposition_data.items()
+        #         if np.sum(np.abs(v['Amplitudes'])) > 1e-5}
     return mode_decomposition_data
 
 if __name__ == '__main__':
     struct_hs = pmg.Structure.from_file(sys.argv[1])
     struct_ls = pmg.Structure.from_file(sys.argv[2])
 
-    irrep_decomposition_data = get_mode_decomposition(struct_hs, struct_ls, nonzero_only=True)
+    irrep_decomposition_data = get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False)
 
     print("Mode Definitions:")
-    for irrep, data in irrep_decomposition_data.items():
+    for irrep, wycks in irrep_decomposition_data.items():
         print(irrep)
-        print(data["Direction"])
-        print(data["Distortion Defs"])
+        for wyck, data in wycks.items():
+            print(wyck)
+            print(data["direction"])
+            print(data["dist_defs"])
+    print()
     print()
     print("Mode Amplitudes")
-    for irrep, data in irrep_decomposition_data.items():
+    for irrep, wycks in irrep_decomposition_data.items():
         print(irrep)
-        print(data["Direction"])
-        print(np.round_(data["Amplitudes"], decimals=5))
-        print(np.round_(data["total_amplitude"], decimals=5))
+        for wyck, data in wycks.items():
+            print(wyck)
+            print(data["direction"])
+            print(np.round_(data["amplitudes"], decimals=5))
+            print(np.round_(data["total_amplitude"], decimals=5))
         # print(np.round_(data["Amplitudes_as"], decimals=5))
