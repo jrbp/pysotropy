@@ -112,10 +112,8 @@ def convert_distortions_basis(distortions, origin,
             irreps[irrep].append(wyck_sc)
     return irreps
 
-# TODO: This is not actually a good way to represent the distortions
-# need better seperation by wyckoff position
-# store in a manner closer to how isotropy outputs
-# then get seperate amplitudes for each wyckoff position listed
+
+# TODO: possibly clean this up now that we really only use this for one wyckoff at a time
 def get_distortion_dec_struct(wycks, struct_to_match, high_sym_wyckoff, struct_hs):
     coords = []
     species = []
@@ -250,7 +248,7 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False):
 
     all_in_sc_basis = convert_distortions_basis(this_subgroup_distortions, origin,
                                                 struct_hs.lattice,
-                                                struct_hs_supercell.lattice) # should be struct_hs_supercell
+                                                struct_hs_supercell.lattice)
 
     irrep_dist_full_pvecs = {}
     irrep_dist_defs = {}
@@ -258,33 +256,11 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False):
 
     mode_decomposition_data = {}
     for irrep, wycks in all_in_sc_basis.items():
-        #(amplitudes_as, amplitudes, dist_defs,
-        # full_projvecs, num_proj_vecs) = get_projection_data(displacements, wycks,
-        #                                                     struct_hs_supercell, wyckoff_list, struct_hs)
         proj_data_by_wyck = get_projection_data(displacements, wycks,
                                                 struct_hs_supercell, wyckoff_list, struct_hs)
         for wyck in proj_data_by_wyck.keys():
             proj_data_by_wyck[wyck]['direction'] = directions_dict[irrep]
         mode_decomposition_data[irrep] = proj_data_by_wyck
-        #irrep_dist_full_pvecs[irrep] = full_projvecs
-        #mode_decomposition_data[irrep]["Full ProjVecs"] = full_projvecs
-        #irrep_dist_defs[irrep] = dist_defs
-        #mode_decomposition_data[irrep]["Distortion Defs"] = dist_defs.as_dict()
-        #irrep_amplitudes[irrep] = amplitudes
-        #mode_decomposition_data[irrep]["Amplitudes_as"] = amplitudes_as
-        #mode_decomposition_data[irrep]["Amplitudes"] = amplitudes
-        #mode_decomposition_data[irrep]["Direction"] = directions_dict[irrep]
-        #mode_decomposition_data[irrep]["total_amplitude"] = np.sqrt(np.sum([a**2 for a in amplitudes]))
-        # print("TESTING:")
-        # print(num_proj_vecs)
-        # print()
-        # print(irrep_dist_full_pvecs[irrep])
-        # print()
-        # print(irrep_amplitudes[irrep])
-        # print()
-        # print(irrep_dist_defs[irrep])
-        # print()
-        # print()
     if nonzero_only:
         nonzero_mode_decomp = {}
         for irrep, wycks in mode_decomposition_data.items():
@@ -294,9 +270,6 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False):
             if tot_amp > 1e-5:
                 nonzero_mode_decomp[irrep] = wycks
         return nonzero_mode_decomp
-
-        # return {k:v for k,v in mode_decomposition_data.items()
-        #         if np.sum(np.abs(v['Amplitudes'])) > 1e-5}
     return mode_decomposition_data
 
 if __name__ == '__main__':
