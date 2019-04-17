@@ -29,27 +29,37 @@ def get_sym_info(struct):
     wyckoff = sga.get_symmetry_dataset()['wyckoffs']
     return sgn, wyckoff
 
-def match_structures(s1, s2):
+def match_structures(s1, s2, scale_lattice=True):
+    """
+    Args
+        s1: high sym structure
+        s2: low sym structure
+        scale_lattice (optional): high_sym_superlcell has same lattice vectors as s2 (no strain)
+    Returns
+        basis: should be the basis that when applied to s1 makes a supercell of the size and orentation of s2
+        origin: any additional translation to best match (applied before applying the basis change to match what isotropy does)
+        displacements
+        high_sym_supercell
+"""
     sm = StructureMatcher(attempt_supercell=True, primitive_cell=False)
+    basis, origin, mapping = sm.get_transformation(s1, s2)
 
     struct_hs_supercell = sm.get_s2_like_s1(s1, s2)
-    sc, t, mapping = sm.get_transformation(s1, s2)
-    basis = sc
 
-    # do I really need to do this scaling thing?
-    struct_hs_supercell_no_scale = sm.get_s2_like_s1(s1, s2)
-    struct_hs_supercell = pmg.Structure(s1.lattice,
-                                        struct_hs_supercell.species,
-                                        [site.frac_coords for site in struct_hs_supercell])
-    origin = np.round_(frac_vec_convert(t,
-                                        struct_hs_supercell_no_scale.lattice,
+    # change origin from the supercell basis to the high sym basis
+    origin = np.round_(frac_vec_convert(origin,
+                                        struct_hs_supercell.lattice,
                                         s2.lattice),
                        decimals=5)
+    if scale_lattice:
+        struct_hs_supercell = pmg.Structure(s1.lattice,
+                                            struct_hs_supercell.species,
+                                            [site.frac_coords for site in struct_hs_supercell])
     displacements = []
     for s_hs, s_ls in zip(struct_hs_supercell, s1):
         disp = np.round_(smallest_disp(s_hs.frac_coords, s_ls.frac_coords), decimals=5)
         displacements.append(disp)
-    return basis, origin, displacements, struct_hs_supercell_no_scale
+    return basis, origin, displacements, struct_hs_supercell
 
 def get_all_distortions(sgn_hs, wyckoff_list, directions, basis, origin):
     directions_dict = {}
