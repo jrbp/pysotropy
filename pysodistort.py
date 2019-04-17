@@ -214,25 +214,16 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False):
     # in general need to use value wyckoff xyz if there are free parameters
     # not needed for perovskites here
     sgn_hs, wyckoff_list = get_sym_info(struct_hs)
-    sgn_ls, wyckoff_list_low_sym = get_sym_info(struct_ls)
-
-    wyckoffs_hs = ' '.join(set(wyckoff_list)) # do I need this? can I just pass wyckoff list
+    sgn_ls = get_sym_info(struct_ls)[0]
 
     basis, origin, displacements, struct_hs_supercell = match_structures(struct_ls, struct_hs)
-
-    # try:
-    #     directions = iso.getDirections(sgn_hs, basis, origin) # isotropy is picky about some things
-    # except iso.IsotropyBasisException:
-    #     basis = np.dot(-1 * np.identity(3), basis)
-    #     directions = iso.getDirections(sgn_hs, basis, origin)
-    #     print("trying with inverted basis {}".format(basis))
-
 
     try:
         directions = iso.getDirections(sgn_hs, basis, origin, subgroup=sgn_ls)
     except iso.IsotropyBasisException:
+        # isotropy is picky about some things
         basis = np.dot(-1 * np.identity(3), basis)
-        directions = iso.getDirections(sgn_hs, basis, origin, subgroup=sgn_ls) # isotropy is picky about some things
+        directions = iso.getDirections(sgn_hs, basis, origin, subgroup=sgn_ls)
         print("trying with inverted basis {}".format(basis))
     except iso.IsotropySubgroupException:
         print("Isotropy isn't recognizing the subgroup relation in this basis")
