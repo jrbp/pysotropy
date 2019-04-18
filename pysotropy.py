@@ -281,7 +281,7 @@ def detect_data_form_and_convert(prop):
         return detect_data_form_and_convert(comma_split_list)
     # remove paren if entirely surrounded in paren with no inner paren
     # return list of paren surrouned bits if there are multiple
-    if re.match(r'^\(.*\)$', prop):
+    if re.match(r'^\s*\(.*\)$', prop): # \s is new (4/16/19), should be tested
         surrounded_by_paren_list = re.findall(r'\((.+?)\)', prop)
         if len(surrounded_by_paren_list) > 1:
             return detect_data_form_and_convert(surrounded_by_paren_list)
@@ -325,6 +325,7 @@ def detect_column_indexes(list_of_lines):
             # the above commented condition breaks Matricies (where the actual matrix is indented past header)
             # but fixes cases where both the header label has spaces and is longer than the actual data
             # if this indentation only happens for matricies we can apply a fix to that special case
+            # another case where this can be an issue seems to be with directions of domains
             # example above condition is useful:
             # shows = ['irrep', 'kpoint'], then getDisplayData('irrep')
             indexes.append(i)
