@@ -29,7 +29,7 @@ def get_sym_info(struct):
     wyckoff = sga.get_symmetry_dataset()['wyckoffs']
     return sgn, wyckoff
 
-def match_structures(s1, s2, scale_lattice=True):
+def match_structures(s1, s2, scale_lattice=False):
     """
     Args
         s1: high sym structure
