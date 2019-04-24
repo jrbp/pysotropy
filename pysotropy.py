@@ -396,12 +396,18 @@ def getIrreps(spacegroup, kpoint=None, setting=None):
 #         directions = [d['Dir'] for d in results]
 #     return directions
 
-def getDirections(spacegroup, basis, origin, subgroup=1, setting=None):
+def getDirections(spacegroup, basis, origin, subgroup=None, setting=None, extra_values=None, extra_shows=None):
+    if subgroup is None:
+        subgroup = 1
     values = {'parent': spacegroup,
               'subgroup': subgroup,
               'basis': _matrix_to_iso_string(basis),
               'origin': ','.join([str(Fraction(i).limit_denominator(10)) for i in origin])}
     shows = ['kpoint']
+    if extra_values is not None:
+        values.update(extra_values)
+    if extra_shows is not None:
+        shows += extra_shows
     with IsotropySession(values, shows, setting=setting) as isos:
         directions = isos.getDisplayData('DIRECTION', delay=0.01)
     return directions
