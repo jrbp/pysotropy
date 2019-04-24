@@ -6,6 +6,11 @@ import pymatgen as pmg
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.analysis.structure_matcher import StructureMatcher
 import pysotropy as iso
+from sympy import sympify, linsolve, EmptySet
+from sympy.parsing.sympy_parser import (parse_expr, standard_transformations,
+                                        implicit_multiplication_application)
+transformations = (standard_transformations + (implicit_multiplication_application,))
+
 
 def frac_vec_convert(vec, lat1, lat2):
     """convert from frac coords of lat 1 to frac coords of lat2"""
@@ -203,6 +208,41 @@ def get_projection_data(displacements, wycks, struct_hs_supercell, high_sym_wyck
                                                for a in amplitudes]))}
     return results_by_wyck
 
+
+def get_amps_direction(irrep, irrep_amp):
+    with iso.IsotropySession(values={'parent': 221, 'irrep': irrep},
+                             shows={'direction', 'subgroup'}) as i:
+        sym_inequiv = i.getDisplayData('ISOTROPY')
+    inequiv_dir_labels = [s['Dir'] for s in sym_inequiv]
+    irrep_domains = {}
+    with iso.IsotropySession() as isos:
+        for lbl in inequiv_dir_labels:
+            these_domains = iso.getDomains(221, irrep, lbl, isos=isos)
+            these_domains[0]['Dir'] = these_domains[0]['Dir'][-1] # hacky fix
+            irrep_domains[lbl] = these_domains
+
+    for lbl, domains in irrep_domains.items():
+        for domain in domains:
+            syms = set()
+            ddir = domain['Dir']
+            eqn_set = []
+            for pos_d, pos_a in zip(ddir, irrep_amp):
+                pos_d_sym = parse_expr(pos_d, transformations=transformations)
+                pos_a_sym = sympify(pos_a)
+                syms.update(pos_d_sym.free_symbols)
+                eqn_set.append(pos_d_sym - pos_a_sym)
+            syms = list(syms)
+            soln = linsolve(eqn_set, syms)
+            if soln == EmptySet():
+                continue
+            eqns = [0 == eqn.subs([(sy, val)
+                                   for sy, val in zip(syms, list(soln)[0])])
+                    for eqn in eqn_set]
+            if not all(eqns):
+                continue
+            return lbl, ddir
+
+
 def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_direction=True):
     """
     Args
@@ -263,7 +303,20 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
         proj_data_by_wyck = get_projection_data(displacements, wycks,
                                                 struct_hs_supercell, wyckoff_list, struct_hs)
         for wyck in proj_data_by_wyck.keys():
-            proj_data_by_wyck[wyck]['direction'] = directions_dict[irrep]
+            this_amp = proj_data_by_wyck[wyck]['amplitudes']
+            syms = []
+            amp_sym = []
+            for el in directions_dict[irrep]:
+                el_sym = parse_expr(el, transformations=transformations)
+                amp_sym.append(el_sym)
+                for s in el_sym.free_symbols:
+                    if s not in syms:
+                        syms.append(s)
+            if len(syms) != len(this_amp):
+                print("WARNING: irrep {} wyck {} has different number of params then amp components".format(irrep, wyck))
+            sym_val_pairs = [(sym, val) for sym, val in zip(syms, this_amp)]
+            this_amp_conv = [round(float(el_sym.subs(sym_val_pairs)), 4) for el_sym in amp_sym]
+            proj_data_by_wyck[wyck]['direction'] = get_amps_direction(irrep, this_amp_conv)
         mode_decomposition_data[irrep] = proj_data_by_wyck
     if nonzero_only:
         nonzero_mode_decomp = {}
