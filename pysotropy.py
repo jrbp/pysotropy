@@ -4,6 +4,7 @@ Python interface to isotropy
 """
 import os
 import logging
+import time
 from itertools import permutations, combinations
 from collections import MutableMapping, MutableSet
 from subprocess import PIPE
@@ -20,7 +21,6 @@ logger.setLevel(logging.DEBUG)
 class IsotropyBombedException(Exception):
     """Raised when Isotropy Bombs"""
     pass
-
 
 class IsotropyBasisException(Exception):
     """Raised when isotropy doen't like the basis (not right handed)"""
@@ -214,7 +214,7 @@ class IsotropySession:
         self.iso_process.stdin.write(bytes(command + "\n", "ascii"))
         self.iso_process.stdin.flush()
 
-    def getDisplayData(self, display, raw=False):
+    def getDisplayData(self, display, raw=False, delay=None):
         """
         Args:
         display: what we are asking isotropy to display
@@ -223,6 +223,9 @@ class IsotropySession:
             otherwise the output is automaticly parsed in to a list of dictionaries
         """
         self.sendCommand("DISPLAY {}".format(display))
+        # really annoying, TODO: should find a way to not need this
+        if delay is not None:
+            time.sleep(delay)
         lines = []
         keep_reading = True
         while keep_reading:
@@ -400,7 +403,7 @@ def getDirections(spacegroup, basis, origin, subgroup=1, setting=None):
               'origin': ','.join([str(Fraction(i).limit_denominator(10)) for i in origin])}
     shows = ['kpoint']
     with IsotropySession(values, shows, setting=setting) as isos:
-        directions = isos.getDisplayData('DIRECTION')
+        directions = isos.getDisplayData('DIRECTION', delay=0.01)
     return directions
 
 def getRepresentations(spacegroup, kpoint_label, irreps=None, setting=None):
