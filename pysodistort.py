@@ -203,7 +203,7 @@ def get_projection_data(displacements, wycks, struct_hs_supercell, high_sym_wyck
                                                for a in amplitudes]))}
     return results_by_wyck
 
-def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False):
+def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_direction=True):
     """
     Args
         struct_hs: high symmetry structure (pymatgen structure)
@@ -223,7 +223,10 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False):
     # in general need to use value wyckoff xyz if there are free parameters
     # not needed for perovskites here
     sgn_hs, wyckoff_list = get_sym_info(struct_hs)
-    sgn_ls = get_sym_info(struct_ls)[0]
+    if general_direction:
+        sgn_ls = None
+    else:
+        sgn_ls = get_sym_info(struct_ls)[0]
 
     basis, origin, displacements, struct_hs_supercell = match_structures(struct_ls, struct_hs)
 
