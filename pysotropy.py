@@ -41,6 +41,10 @@ class Shows(MutableSet):
                 item = item.upper()
                 self.add(item)
 
+    def update(self, iterable):
+        for i in iterable:
+            self.add(i)
+
     def __contains__(self, item):
         item = item.upper()
         return item in self._shows
