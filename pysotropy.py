@@ -424,6 +424,25 @@ def getRepresentations(spacegroup, kpoint_label, irreps=None, setting=None):
             irrep_dict[irrep] = mat_list
     return irrep_dict
 
+def getDomains(parent, irrep, direction=None, setting=None, extra_shows=[], extra_values={}, isos=None):
+    values = {'parent': parent,
+              'irrep': irrep,}
+    if direction is not None:
+        values['direction'] = direction
+    shows = ['direction vector', 'domains', 'subgroup', 'distinct']
+    shows += extra_shows
+    values.update(extra_values)
+    if isos is not None:
+        # isos.shows.clearAll()
+        isos.shows.update(shows)
+        # isos.values.clearAll()
+        isos.values.update(values)
+        domains = isos.getDisplayData('ISOTROPY', raw=False)
+    else:
+        with IsotropySession(values, shows, setting=setting) as isos:
+            domains = isos.getDisplayData('ISOTROPY', raw=False)
+    return domains
+
 def getDistortion(parent, wyckoffs, irrep, direction=None, cell=None,
                   origin=None, domain=None, setting=None, isos=None):
     values = {'parent': parent,
