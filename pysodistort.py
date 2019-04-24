@@ -280,23 +280,23 @@ if __name__ == '__main__':
     struct_hs = pmg.Structure.from_file(sys.argv[1])
     struct_ls = pmg.Structure.from_file(sys.argv[2])
 
-    irrep_decomposition_data = get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False)
+    irrep_decomposition_data = get_mode_decomposition(struct_hs, struct_ls, nonzero_only=True)
 
     print("Mode Definitions:")
     for irrep, wycks in irrep_decomposition_data.items():
         print(irrep)
         for wyck, data in wycks.items():
-            print(wyck)
-            print(data["direction"])
-            print(data["dist_defs"])
+            print('\t', wyck)
+            print('\t\t', data["direction"])
+            print('\t\t', data["dist_defs"])
     print()
     print()
     print("Mode Amplitudes")
     for irrep, wycks in irrep_decomposition_data.items():
         print(irrep)
         for wyck, data in wycks.items():
-            print(wyck)
-            print(data["direction"])
-            print(np.round_(data["amplitudes"], decimals=5))
-            print(np.round_(data["total_amplitude"], decimals=5))
+            print('\t', wyck)
+            print('\t\t', data["direction"])
+            print('\t\t', np.round_(data["amplitudes"], decimals=5))
+            print('\t\t', np.round_(data["total_amplitude"], decimals=5))
         # print(np.round_(data["Amplitudes_as"], decimals=5))
