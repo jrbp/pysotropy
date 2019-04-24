@@ -91,8 +91,9 @@ class Values(MutableMapping):
 
     def __setitem__(self, key, value):
         key = key.upper()
-        self.parent.sendCommand("VALUE {} {}".format(key, value))
-        self._vals[key] = value
+        if key not in self._vals or self._vals[key] != value:
+            self.parent.sendCommand("VALUE {} {}".format(key, value))
+            self._vals[key] = value
 
     def __getitem__(self, key):
         key = key.upper()
