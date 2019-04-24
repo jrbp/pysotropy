@@ -209,21 +209,20 @@ def get_projection_data(displacements, wycks, struct_hs_supercell, high_sym_wyck
     return results_by_wyck
 
 
-# TODO: IMPORTANT, DON'T HARDCODE PARENT AS 221
-def get_amps_direction(irrep, irrep_amp, isos=None):
+def get_amps_direction(parent, irrep, irrep_amp, isos=None):
     if isos is None:
         close_after = True
         isos = iso.IsotropySession()
     else:
         close_after = False
-    isos.values.update({'parent': 221, 'irrep': irrep})
+    isos.values.update({'parent': parent, 'irrep': irrep})
     isos.shows.update({'direction', 'subgroup'})
     sym_inequiv = isos.getDisplayData('ISOTROPY')
     isos.shows.clearAll()
     inequiv_dir_labels = [s['Dir'] for s in sym_inequiv]
     irrep_domains = {}
     for lbl in inequiv_dir_labels:
-        these_domains = iso.getDomains(221, irrep, lbl, isos=isos)
+        these_domains = iso.getDomains(parent, irrep, lbl, isos=isos)
         these_domains[0]['Dir'] = these_domains[0]['Dir'][-1] # hacky fix
         irrep_domains[lbl] = these_domains
     isos.shows.clearAll()
@@ -328,7 +327,7 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
                 sym_val_pairs = [(sym, val) for sym, val in zip(syms, this_amp)]
                 this_amp_conv = [round(float(el_sym.subs(sym_val_pairs)), 4) for el_sym in amp_sym]
                 print(irrep, wyck)
-                proj_data_by_wyck[wyck]['direction'] = get_amps_direction(irrep, this_amp_conv, isos=isos)
+                proj_data_by_wyck[wyck]['direction'] = get_amps_direction(sgn_hs, irrep, this_amp_conv, isos=isos)
             mode_decomposition_data[irrep] = proj_data_by_wyck
     if nonzero_only:
         nonzero_mode_decomp = {}
