@@ -209,17 +209,27 @@ def get_projection_data(displacements, wycks, struct_hs_supercell, high_sym_wyck
     return results_by_wyck
 
 
-def get_amps_direction(irrep, irrep_amp):
-    with iso.IsotropySession(values={'parent': 221, 'irrep': irrep},
-                             shows={'direction', 'subgroup'}) as i:
-        sym_inequiv = i.getDisplayData('ISOTROPY')
+# TODO: IMPORTANT, DON'T HARDCODE PARENT AS 221
+def get_amps_direction(irrep, irrep_amp, isos=None):
+    if isos is None:
+        close_after = True
+        isos = iso.IsotropySession()
+    else:
+        close_after = False
+    isos.values.update({'parent': 221, 'irrep': irrep})
+    isos.shows.update({'direction', 'subgroup'})
+    sym_inequiv = isos.getDisplayData('ISOTROPY')
+    isos.shows.clearAll()
     inequiv_dir_labels = [s['Dir'] for s in sym_inequiv]
     irrep_domains = {}
-    with iso.IsotropySession() as isos:
-        for lbl in inequiv_dir_labels:
-            these_domains = iso.getDomains(221, irrep, lbl, isos=isos)
-            these_domains[0]['Dir'] = these_domains[0]['Dir'][-1] # hacky fix
-            irrep_domains[lbl] = these_domains
+    for lbl in inequiv_dir_labels:
+        these_domains = iso.getDomains(221, irrep, lbl, isos=isos)
+        these_domains[0]['Dir'] = these_domains[0]['Dir'][-1] # hacky fix
+        irrep_domains[lbl] = these_domains
+    isos.shows.clearAll()
+    isos.values.clearAll()
+    if close_after:
+        isos.__exit__(None, None, None)
 
     for lbl, domains in irrep_domains.items():
         for domain in domains:
@@ -299,25 +309,27 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
     irrep_amplitudes = {}
 
     mode_decomposition_data = {}
-    for irrep, wycks in all_in_sc_basis.items():
-        proj_data_by_wyck = get_projection_data(displacements, wycks,
-                                                struct_hs_supercell, wyckoff_list, struct_hs)
-        for wyck in proj_data_by_wyck.keys():
-            this_amp = proj_data_by_wyck[wyck]['amplitudes']
-            syms = []
-            amp_sym = []
-            for el in directions_dict[irrep]:
-                el_sym = parse_expr(el, transformations=transformations)
-                amp_sym.append(el_sym)
-                for s in el_sym.free_symbols:
-                    if s not in syms:
-                        syms.append(s)
-            if len(syms) != len(this_amp):
-                print("WARNING: irrep {} wyck {} has different number of params then amp components".format(irrep, wyck))
-            sym_val_pairs = [(sym, val) for sym, val in zip(syms, this_amp)]
-            this_amp_conv = [round(float(el_sym.subs(sym_val_pairs)), 4) for el_sym in amp_sym]
-            proj_data_by_wyck[wyck]['direction'] = get_amps_direction(irrep, this_amp_conv)
-        mode_decomposition_data[irrep] = proj_data_by_wyck
+    with iso.IsotropySession() as isos:
+        for irrep, wycks in all_in_sc_basis.items():
+            proj_data_by_wyck = get_projection_data(displacements, wycks,
+                                                    struct_hs_supercell, wyckoff_list, struct_hs)
+            for wyck in proj_data_by_wyck.keys():
+                this_amp = proj_data_by_wyck[wyck]['amplitudes']
+                syms = []
+                amp_sym = []
+                for el in directions_dict[irrep]:
+                    el_sym = parse_expr(el, transformations=transformations)
+                    amp_sym.append(el_sym)
+                    for s in el_sym.free_symbols:
+                        if s not in syms:
+                            syms.append(s)
+                if len(syms) != len(this_amp):
+                    print("WARNING: irrep {} wyck {} has different number of params then amp components".format(irrep, wyck))
+                sym_val_pairs = [(sym, val) for sym, val in zip(syms, this_amp)]
+                this_amp_conv = [round(float(el_sym.subs(sym_val_pairs)), 4) for el_sym in amp_sym]
+                print(irrep, wyck)
+                proj_data_by_wyck[wyck]['direction'] = get_amps_direction(irrep, this_amp_conv, isos=isos)
+            mode_decomposition_data[irrep] = proj_data_by_wyck
     if nonzero_only:
         nonzero_mode_decomp = {}
         for irrep, wycks in mode_decomposition_data.items():
