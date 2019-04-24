@@ -424,7 +424,8 @@ def getRepresentations(spacegroup, kpoint_label, irreps=None, setting=None):
             irrep_dict[irrep] = mat_list
     return irrep_dict
 
-def getDistortion(parent, wyckoffs, irrep, direction=None, cell=None, origin=None, domain=None):
+def getDistortion(parent, wyckoffs, irrep, direction=None, cell=None,
+                  origin=None, domain=None, setting=None, isos=None):
     values = {'parent': parent,
               'wyckoff': ' '.join(wyckoffs),
               'irrep': irrep,}
@@ -433,12 +434,21 @@ def getDistortion(parent, wyckoffs, irrep, direction=None, cell=None, origin=Non
     if cell is not None:
         values['cell'] = _matrix_to_iso_string(cell)
     if domain is not None:
+        # should consider throwing an exception if domain is given without direction
         values['domain'] = str(domain)
+    # origin doesn't seem to alter output
     # if origin is not None:
     #     values['origin'] = ','.join([str(Fraction(i)) for i in origin])
     shows = ['wyckoff', 'microscopic vector']
-    with IsotropySession(values, shows) as isos:
+    if isos is not None:
+        # isos.values.clearAll()
+        isos.values.update(values)
+        # isos.shows.clearAll()
+        isos.shows.update(shows)
         dist = isos.getDisplayData('DISTORTION', raw=False)
+    else:
+        with IsotropySession(values, shows, setting=setting) as isos:
+            dist = isos.getDisplayData('DISTORTION', raw=False)
     # if there is one projected vector for each point we may want to
     # change this so that it is a list of length 1 so data is in same
     # form as cases where there are multiple vectors for each point
