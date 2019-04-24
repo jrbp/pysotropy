@@ -64,19 +64,20 @@ def match_structures(s1, s2, scale_lattice=False):
 def get_all_distortions(sgn_hs, wyckoff_list, directions, basis, origin):
     directions_dict = {}
     distortions = {}
-    for direct in directions:
-        if iso._kpt_has_params(direct['k vector']):
-            print("low sym kpoint not implemented yet skipping")
-            print(direct)
-            #TODO: this can be easily implented by setting kvalue correctly using the value by getDirections
-            continue
-        irrep = direct['Irrep']
-        d = "vector,{}".format(','.join(direct['Dir']))
-        this_dist = iso.getDistortion(sgn_hs, wyckoff_list,
-                                      irrep, cell=basis, origin=origin, direction=d)
-        if len(this_dist) > 0:
-            distortions[irrep] = this_dist
-            directions_dict[irrep] = direct['Dir']
+    with iso.IsotropySession() as isos:
+        for direct in directions:
+            if iso._kpt_has_params(direct['k vector']):
+                print("low sym kpoint not implemented yet skipping")
+                print(direct)
+                #TODO: this can be easily implented by setting kvalue correctly using the value by getDirections
+                continue
+            irrep = direct['Irrep']
+            d = "vector,{}".format(','.join(direct['Dir']))
+            this_dist = iso.getDistortion(sgn_hs, wyckoff_list,
+                                          irrep, cell=basis, origin=origin, direction=d, isos=isos)
+            if len(this_dist) > 0:
+                distortions[irrep] = this_dist
+                directions_dict[irrep] = direct['Dir']
     return distortions, directions_dict
 
 def convert_distortions_basis(distortions, origin,
