@@ -13,7 +13,6 @@ from glob import glob
 from fractions import Fraction
 import numpy as np
 from sarge import Command, Capture
-#from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -223,7 +222,7 @@ class IsotropySession:
             otherwise the output is automaticly parsed in to a list of dictionaries
         """
         self.sendCommand("DISPLAY {}".format(display))
-        # really annoying, TODO: should find a way to not need this
+        # really annoying, TODO: should find a way to not need this delay ever
         if delay is not None:
             time.sleep(delay)
         lines = []
@@ -233,12 +232,10 @@ class IsotropySession:
             if this_line in ['*', '']:  # if there is no output '' is returned above
                 keep_reading = False
             elif re.match(".*Data base for these coupled subgroups .*", this_line):
-                self.read_iso_line() # read past Should this
+                self.read_iso_line() # read past Should this...
                 self.read_iso_line() # read past Enter RETURN
                 self.sendCommand("")
                 self.read_iso_line() # read past Adding
-                # self.read_iso_line() # read past Blank
-                # self.read_iso_line() # read past Blank is this one inconsistent?
                 for i in range(10):
                     possibly_blank = self.read_iso_line()
                     if not (possibly_blank in ['*', '']):  # if there is no output '' is returned above
@@ -258,11 +255,14 @@ class IsotropySession:
         raw = self.iso_process.stdout.readline().decode()
         this_line = raw.rstrip('\n')
         logger.debug("isotropy: {}".format(this_line))
-        if re.match('.*program\shas\sbombed.*', this_line):
+        if re.match('.*program\shas\sbombed.*',
+                    this_line):
             raise IsotropyBombedException()
-        if re.match(".*Basis\svectors\sare\snot\sa\sright\-handed\sset.*", this_line):
+        if re.match(".*Basis\svectors\sare\snot\sa\sright\-handed\sset.*",
+                    this_line):
             raise IsotropyBasisException()
-        if re.match(".*not\sall\selements\sof\sthe\ssubgroup\sare\selements\sof\sparent\sgroup.*", this_line):
+        if re.match(".*not\sall\selements\sof\sthe\ssubgroup\sare\selements\sof\sparent\sgroup.*",
+                    this_line):
             raise IsotropySubgroupException()
         return this_line
 
@@ -383,18 +383,6 @@ def getIrreps(spacegroup, kpoint=None, setting=None):
         results = isos.getDisplayData('irrep')
         irreps = [ir['Irrep (ML)'] for ir in results]
     return irreps
-
-# def getIrrepDirections(spacegroup, irrep, setting=None, vector=False):
-#     # TODO: add option to get vectors
-#     values = {'parent': spacegroup, 'irrep': irrep}
-#     if vector:
-#         shows = ['direction']
-#     else:
-#         shows = ['direction']
-#     with IsotropySession(values, shows, setting) as isos:
-#         results = isos.getDisplayData('isotropy')
-#         directions = [d['Dir'] for d in results]
-#     return directions
 
 def getDirections(spacegroup, basis, origin, subgroup=None, setting=None, extra_values=None, extra_shows=None):
     if subgroup is None:
@@ -608,141 +596,7 @@ def getPossibleOPs_for_basis(parent, subgroup, basis, origin, coupled_order=2):
         if (abs(this_origin - basis[1]) < 1e-5).all() and _in_basis_permutations(basis[0],
                                                                                  this_basis):
             compatible_ops.append(op)
-        #
-        # for b, o in equivalent_basis:
-        #     if (abs(this_origin - o) < 1e-5).all() and _in_basis_permutations(b, this_basis):
-        #         compatible_ops.append(op)
-        #         break
     return compatible_ops
-
-
-
-#  def getPossiblePhaseTransitions(struct_hs, struct_ls):
-#     """
-#     Given two pymatgen structure objects (high symmetry and low symmetry)
-#     find all irreps describing an order parameter of the phase transition between these structures
-#
-#     returns a 'phase transition' which is just a dict containing:
-#             'structure_high_sym'
-#             'structure_low_sym'
-#             'parent'
-#             'subgroup'
-#             'irrep'
-#             'direction'
-#             'basis'
-#             'origin'
-#             'secondary_OPs' - other order parameters which do not lower symmetry more than the primary OP
-#                               a dict of 'irrep', 'direction', 'domain', 'frequency'
-#     """
-#     sga_hs = SpacegroupAnalyzer(struct_hs)
-#     sga_ls = SpacegroupAnalyzer(struct_ls)
-#     struct_hs_p = sga_hs.get_primitive_standard_structure()
-#     struct_ls_p = sga_ls.get_primitive_standard_structure()
-#     sgn_hs = sga_hs.get_space_group_number()
-#     sgn_ls = sga_ls.get_space_group_number()
-#     # not limiting results by ratio since the size in isotropy doesn't account for changes of unit cell
-#     # seems like it might only allow for diagonal basis?? NO! even tutorial has examples with nondiagonal basis
-#     # ratio = len(struct_ls_p) / len(struct_hs_p)
-#     # if ratio % 1 != 0:
-#     #     raise ValueError(("Number of sites in low symmetry structure must be",
-#     #                       " an integer times the number of sites in high symmetry structure"))
-#     # ratio = int(ratio)
-#     # values = {'parent': sgn_hs, 'subgroup': sgn_ls, 'size': ratio}
-#     values = {'parent': sgn_hs, 'subgroup': sgn_ls}
-#     shows = ['irrep', 'direction', 'basis', 'origin']
-#     possible_transitions = []
-#     with IsotropySession(values, shows) as isos:
-#         lines = isos.getDisplayData('ISOTROPY')
-#         for line in lines[1:-1]:
-#             irrep, direction, basis, origin = line.split()[:4]
-#             this_transition = {'structure_high_sym': struct_hs_p,
-#                                'structure_low_sym': struct_ls_p,
-#                                'parent': sgn_hs,
-#                                'subgroup': sgn_ls,
-#                                'irrep': irrep,
-#                                'direction': direction,
-#                                'basis': to_array(basis),
-#                                'origin': to_array(origin)}
-#             isos.shows.clearAll()
-#             isos.shows.add('frequency direction')
-#             isos.values['irrep'] = irrep
-#             freq_output = isos.getDisplayData('ISOTROPY')
-#             del isos.values['irrep']
-#             raw_sec_ops = freq_output[1].split(',')
-#             sec_ops = []
-#             for sop in raw_sec_ops:
-#                 freq, s_irrep, raw_s_dir = sop.split()
-#                 freq = int(freq)
-#                 s_dir, s_domain = raw_s_dir.rstrip(')').split('(')
-#                 sec_ops.append({'irrep': s_irrep,
-#                                 'direction': s_dir,
-#                                 'frequency': freq,
-#                                 'domain': s_domain})
-#             this_transition['secondary_OPs'] = sec_ops
-#             possible_transitions.append(this_transition)
-#     return possible_transitions
-#
-#
-#  def getAllowedMicroDistortions(phase_transition):
-#      """
-#      Given a 'phase transition' (likely from the getPossiblePhaseTransitions function)
-#      find allowed displacive modes for all primary and secondary order parameters
-#
-#      returns a list where each element corresponds to an order parameter
-#      each element of this list is a tuple where the first element is a dict describing the order parameter
-#      and the second element is a list of modes
-#      each mode is a tuple of the form (wyckoff label, [points], [(displacement vectors)])
-#      the actual distortions can then by projected on to the displacement vectors to
-#      separate the contributions from each mode
-#      displacement vectors is a tuple since multidimensional irreps will have more than one at each point
-#      """
-#      sga_hs = SpacegroupAnalyzer(phase_transition['structure_high_sym'])
-#      wyckoffs = ' '.join(set(sga_hs.get_symmetry_dataset()['wyckoffs']))
-#      values = {'parent': phase_transition['parent'],
-#                'wyckoff': wyckoffs}
-#      shows = ['wyckoff', 'microscopic vector']
-#      dists = []
-#      with IsotropySession(values, shows) as isos:
-#          for s_op in phase_transition['secondary_OPs']:
-#              isos.values['irrep'] = s_op['irrep']
-#              isos.values['direction'] = s_op['direction']
-#              raw_dist_out = isos.getDisplayData('DISTORTION')
-#              distortions = []
-#              first_dist = True
-#              for line in raw_dist_out:
-#                  if re.match('.*Wyckoff Point.*', line) or re.match(r'\*\*+', line) or line == '':
-#                      pass
-#                  # elif line[0] in wyckoffs.split():
-#                  elif re.match('[a-z]', line[0]):
-#                      if not first_dist:
-#                          distortions.append(this_dist)
-#                      wyck_lbl, point= line.split()[:2]
-#                      proj_vecs = line.split()[2:]
-#                      this_dist = (wyck_lbl, [to_array(point)], [[to_array(pv.rstrip(',')) for pv in proj_vecs]])
-#                      first_dist = False
-#                  elif line == '*':
-#                      distortions.append(this_dist)
-#                  else:
-#                      point = line.split()[0]
-#                      proj_vecs = line.split()[1:]
-#                      this_dist[1].append(to_array(point))
-#                      this_dist[2].append([to_array(pv.rstrip(',')) for pv in proj_vecs])
-#              if len(distortions) == 0:
-#                  pass
-#              else:
-#                  dists.append((s_op, distortions))
-#      return dists
-#
-#
-#def to_array(ar_str):
-#    as_mat = [[mm
-#               for mm in v.split(',')]
-#              for v in ar_str.rstrip(')').lstrip('(').split('),(')]
-#    if len(as_mat) == 1:
-#        result = as_mat[0]
-#    else:
-#        result = as_mat
-#    return result
 
 
 if __name__ == '__main__':
