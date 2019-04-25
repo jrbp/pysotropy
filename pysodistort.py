@@ -37,7 +37,7 @@ def get_sym_info(struct):
     wyckoff = sga.get_symmetry_dataset()['wyckoffs']
     return sgn, wyckoff
 
-def match_structures(s1, s2, scale_lattice=False):
+def match_structures(s1, s2, scale_lattice=False, rh_only=True):
     """
     Args
         s1: high sym structure
@@ -50,9 +50,9 @@ def match_structures(s1, s2, scale_lattice=False):
         high_sym_supercell
 """
     sm = StructureMatcher(attempt_supercell=True, primitive_cell=False)
-    basis, origin, mapping = sm.get_transformation(s1, s2)
+    basis, origin, mapping = sm.get_transformation(s1, s2, rh_only=rh_only)
 
-    struct_hs_supercell = sm.get_s2_like_s1(s1, s2)
+    struct_hs_supercell = sm.get_s2_like_s1(s1, s2, rh_only=rh_only)
 
     # change origin from the supercell basis to the high sym basis
     origin = np.round_(frac_vec_convert(origin,
@@ -127,7 +127,7 @@ def get_distortion_dec_struct(wycks, struct_to_match, high_sym_wyckoff, struct_h
     species = []
     proj_vecs = []
     wycks_done = []  # dirty maybe wrong fix
-    for wyck in wycks:
+    for wyck in wycks:  # CURRENTLY ONLY ONE WYCKOFF IS PASSED AT A TIME, SO THIS IS FINE, BUT UNNECESSARY
         w = wyck["Wyckoff"]
         # PEROVSKITE SPECIFIC, AND I DON'T KNOW IF IT'S THE RIGHT THING TO DO!!!!
         if w in wycks_done:
