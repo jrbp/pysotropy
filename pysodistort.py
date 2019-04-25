@@ -285,10 +285,13 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
         directions = iso.getDirections(sgn_hs, basis, origin, subgroup=sgn_ls)
     except iso.IsotropyBasisException:
         # isotropy is picky about some things
+        # rh_only option now in match_structures should make this unnecessary
         basis = np.dot(-1 * np.identity(3), basis)
         directions = iso.getDirections(sgn_hs, basis, origin, subgroup=sgn_ls)
         logger.warning("trying with inverted basis {}".format(basis))
     except iso.IsotropySubgroupException:
+        # this should also never happen now that we start with geeral directions
+        # and sort the rest out later
         logger.warning("Isotropy isn't recognizing the subgroup relation in this basis")
         logger.warning("trying more general projections")
         logger.warning("Perhaps double check this")
@@ -314,8 +317,14 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
         for irrep, wycks in all_in_sc_basis.items():
             proj_data_by_wyck = get_projection_data(displacements, wycks,
                                                     struct_hs_supercell, wyckoff_list, struct_hs)
+            # TODO: clean this up, also don't find directions for irreps with amp==0
+            # should move a lot of the direction stuff to its own function
             for wyck in proj_data_by_wyck.keys():
                 this_amp = proj_data_by_wyck[wyck]['amplitudes']
+                # temporary work around until cleaned up properly
+                if np.sum(np.abs(this_amp)) < 1e-6:
+                    proj_data_by_wyck[wyck]['direction'] = ('zero', [0.,0.,0.])
+                    continue
                 syms = []
                 amp_sym = []
                 for el in directions_dict[irrep]:
