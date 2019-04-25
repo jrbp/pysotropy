@@ -168,7 +168,7 @@ def get_projection_data(displacements, wycks, struct_hs_supercell, high_sym_wyck
     for n, wyck in enumerate(wycks):
         num_proj_vecs = len(wycks[0]["Projected Vectors"][0])
         amplitudes = [0. for i in range(num_proj_vecs)]
-        amplitudes_as = [0. for i in range(num_proj_vecs)]
+        amplitude_as_comps = [0. for i in range(num_proj_vecs)]
         dist_struct_matched, mapping = get_distortion_dec_struct([wyck], struct_hs_supercell, high_sym_wyckoff, struct_hs)
         dist_defs = dist_struct_matched
         full_projvecs = []
@@ -184,24 +184,17 @@ def get_projection_data(displacements, wycks, struct_hs_supercell, high_sym_wyck
                 pv_cart = struct_hs_supercell.lattice.get_cartesian_coords(pv[i])
                 sum_cart_squares += pv_cart.dot(pv_cart)
             norm_factor = sum_cart_squares**(-1/2)
-            # norm_factor = (np.sqrt(np.sum([struct_hs_supercell.lattice.get_cartesian_coords(pv[i]).dot(struct_hs_supercell.lattice.get_cartesian_coords(pv[i]))
-            #                                for pv in full_projvecs])))**-1
             for disp, pv in zip(displacements, full_projvecs):
                 amplitudes[i] += np.dot(disp, pv[i])
+                disp_cart = struct_hs_supercell.lattice.get_cartesian_coords(disp)
+                pv_cart = struct_hs_supercell.lattice.get_cartesian_coords(pv[i])
+                amplitude_as_comps[i] += np.dot(norm_factor * disp_cart, pv_cart)
+            amplitude_as = np.sqrt(np.sum([am**2 for am in amplitude_as_comps]))
+            amplitude_ap = amplitude_as * np.sqrt(struct_hs.lattice.volume / struct_hs_supercell.lattice.volume)
 
-                pv_np = norm_factor * np.array(pv[i], dtype=float)
-                proj_disp_cart = struct_hs_supercell.lattice.get_cartesian_coords(np.dot(disp, pv_np) * pv_np)
-                logger.debug("get_projection_data: ")
-                logger.debug("displacement:\t{}".format(disp))
-                logger.debug("projvec:\t{}".format(pv_np))
-                logger.debug("pv_norm:\t{}".format(norm_factor))
-                logger.debug("proj_disp_cart:\t{}".format(proj_disp_cart))
-                logger.debug("distance:\t{}".format(proj_disp_cart.dot(proj_disp_cart)))
-                # amplitudes_as[i] += norm_factor * proj_disp_cart.dot(proj_disp_cart)
-                amplitudes_as[i] += proj_disp_cart.dot(proj_disp_cart)
-            amplitudes_as[i] += np.sqrt(amplitudes_as[i])
         results_by_wyck['{}{}'.format(wyck['Wyckoff'], n)] = {
-            'amplitudes_as': amplitudes_as,
+            'amplitude_as': amplitude_as,
+            'amplitude_ap': amplitude_ap,
             'amplitudes': amplitudes,
             'dist_defs': dist_defs,
             'full_projvecs': full_projvecs,
@@ -251,7 +244,9 @@ def get_amps_direction(parent, irrep, irrep_amp, isos=None):
                     for eqn in eqn_set]
             if not all(eqns):
                 continue
-            return lbl, ddir
+            var_vals = list(zip([str(s) for s in syms], list(soln)[0]))
+            logger.debug(var_vals)
+            return lbl, ddir, var_vals
 
 
 def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_direction=True):
@@ -298,8 +293,8 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
         directions = iso.getDirections(sgn_hs, basis, origin)
 
     logger.info("Basis: \n{}".format(basis))
-    logger.info("Origin detected: {}".format(origin))
-    logger.info("Origin using: {}".format([str(Fraction(i).limit_denominator(10)) for i in origin]))
+    logger.info("Origin: {}".format(origin))
+    logger.debug("Origin using: {}".format([str(Fraction(i).limit_denominator(10)) for i in origin]))
 
     this_subgroup_distortions, directions_dict = get_all_distortions(sgn_hs, list(set(wyckoff_list)),
                                                                      directions, basis, origin)
@@ -338,7 +333,16 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
                 sym_val_pairs = [(sym, val) for sym, val in zip(syms, this_amp)]
                 this_amp_conv = [round(float(el_sym.subs(sym_val_pairs)), 4) for el_sym in amp_sym]
                 logger.info("{}  {}".format(irrep, wyck))
-                proj_data_by_wyck[wyck]['direction'] = get_amps_direction(sgn_hs, irrep, this_amp_conv, isos=isos)
+                dir_lbl, dir_vec, var_vals = get_amps_direction(sgn_hs, irrep, this_amp_conv, isos=isos)
+                proj_data_by_wyck[wyck]['direction'] = (dir_lbl, dir_vec)
+                # TODO: really seperate components properly and give seperate amplitudes for each freee param
+                # currently As and Ap will only be right with one free param
+                # otherwise they will be both mixed together and sign will be always positive
+                if len(var_vals) == 1:
+                    sign = float(var_vals[0][1] / abs(var_vals[0][1]))
+                    proj_data_by_wyck[wyck]['amplitude_as'] = sign * proj_data_by_wyck[wyck]['amplitude_as']
+                    proj_data_by_wyck[wyck]['amplitude_ap'] = sign * proj_data_by_wyck[wyck]['amplitude_ap']
+                proj_data_by_wyck[wyck]['param_vals'] = var_vals
             mode_decomposition_data[irrep] = proj_data_by_wyck
     if nonzero_only:
         nonzero_mode_decomp = {}
@@ -379,5 +383,6 @@ if __name__ == '__main__':
             logger.info('\t{}'.format(wyck))
             logger.info('\t\t{}'.format(data["direction"]))
             logger.info('\t\t{}'.format(np.round_(data["amplitudes"], decimals=5)))
-            logger.info('\t\t{}'.format(np.round_(data["total_amplitude"], decimals=5)))
+            logger.info('\t\tAs: {}'.format(np.round_(data["amplitude_as"], decimals=5)))
+            logger.info('\t\tAp: {}'.format(np.round_(data["amplitude_ap"], decimals=5)))
         # logger.info(np.round_(data["Amplitudes_as"], decimals=5))
