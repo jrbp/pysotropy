@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import sys
+import logging
 from fractions import Fraction
 import numpy as np
 import pymatgen as pmg
@@ -9,6 +10,8 @@ import pysotropy as iso
 from sympy import sympify, linsolve, EmptySet
 from sympy.parsing.sympy_parser import (parse_expr, standard_transformations,
                                         implicit_multiplication_application)
+logger = logging.getLogger("pysotropy")
+logger.setLevel(logging.DEBUG)
 transformations = (standard_transformations + (implicit_multiplication_application,))
 
 
@@ -72,8 +75,7 @@ def get_all_distortions(sgn_hs, wyckoff_list, directions, basis, origin):
     with iso.IsotropySession() as isos:
         for direct in directions:
             if iso._kpt_has_params(direct['k vector']):
-                print("low sym kpoint not implemented yet skipping")
-                print(direct)
+                logger.warning("low sym kpoint not implemented yet skipping {}".format(direct))
                 #TODO: this can be easily implented by setting kvalue correctly using the value by getDirections
                 continue
             irrep = direct['Irrep']
@@ -142,21 +144,21 @@ def get_distortion_dec_struct(wycks, struct_to_match, high_sym_wyckoff, struct_h
             species.append(sp)
             coords.append(coord)
             proj_vecs.append(pv)
-    # print(coords)
-    # print(species)
-    # print(proj_vecs)
+    logger.debug("get_distortion_dec_struct:")
+    logger.debug("coords:\n{}".format(coords))
+    logger.debug("species:\n{}".format(species))
+    logger.debug("proj_vecs:\n{}".format(proj_vecs))
     lat = struct_to_match.lattice
     dist_struct = pmg.Structure(lat, species, coords, site_properties={"projvecs": proj_vecs})
-    # print(dist_struct)
+    logger.debug("dist_struct:\n{}".format(dist_struct))
 
     sm_dist = StructureMatcher(ltol = 0.02, primitive_cell=False, allow_subset=True)
     try:
         sc_d, trans_d, mapping = sm_dist.get_transformation(struct_to_match, dist_struct)
     except TypeError:
-        print(dist_struct)
-        print()
-        print(struct_to_match)
-    # print(transformation)
+        logger.warning("couldn't map dist decorated structure to actual structure")
+        logger.warning("dist dec struct:\n{}".format(dist_struct))
+        logger.warning("struct to match:\n{}".format(struct_to_match))
     dist_struct_matched = dist_struct * sc_d
     dist_struct_matched.translate_sites(list(range(len(dist_struct_matched))), trans_d)
     return dist_struct_matched, mapping
@@ -189,12 +191,12 @@ def get_projection_data(displacements, wycks, struct_hs_supercell, high_sym_wyck
 
                 pv_np = norm_factor * np.array(pv[i], dtype=float)
                 proj_disp_cart = struct_hs_supercell.lattice.get_cartesian_coords(np.dot(disp, pv_np) * pv_np)
-                # print("displacement:\t{}".format(disp))
-                # print("projvec:\t{}".format(pv_np))
-                # print("pv_norm:\t{}".format(norm_factor))
-                # print("proj_disp_cart:\t{}".format(proj_disp_cart))
-                # print("distance:\t{}".format(proj_disp_cart.dot(proj_disp_cart)))
-                # print()
+                logger.debug("get_projection_data: ")
+                logger.debug("displacement:\t{}".format(disp))
+                logger.debug("projvec:\t{}".format(pv_np))
+                logger.debug("pv_norm:\t{}".format(norm_factor))
+                logger.debug("proj_disp_cart:\t{}".format(proj_disp_cart))
+                logger.debug("distance:\t{}".format(proj_disp_cart.dot(proj_disp_cart)))
                 # amplitudes_as[i] += norm_factor * proj_disp_cart.dot(proj_disp_cart)
                 amplitudes_as[i] += proj_disp_cart.dot(proj_disp_cart)
             amplitudes_as[i] += np.sqrt(amplitudes_as[i])
@@ -285,16 +287,16 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
         # isotropy is picky about some things
         basis = np.dot(-1 * np.identity(3), basis)
         directions = iso.getDirections(sgn_hs, basis, origin, subgroup=sgn_ls)
-        print("trying with inverted basis {}".format(basis))
+        logger.warning("trying with inverted basis {}".format(basis))
     except iso.IsotropySubgroupException:
-        print("Isotropy isn't recognizing the subgroup relation in this basis")
-        print("trying more general projections")
-        print("Perhaps double check this")
+        logger.warning("Isotropy isn't recognizing the subgroup relation in this basis")
+        logger.warning("trying more general projections")
+        logger.warning("Perhaps double check this")
         directions = iso.getDirections(sgn_hs, basis, origin)
 
-    print("Basis: \n{}".format(basis))
-    print("Origin detected: {}".format(origin))
-    print("Origin using: {}".format([str(Fraction(i).limit_denominator(10)) for i in origin]))
+    logger.info("Basis: \n{}".format(basis))
+    logger.info("Origin detected: {}".format(origin))
+    logger.info("Origin using: {}".format([str(Fraction(i).limit_denominator(10)) for i in origin]))
 
     this_subgroup_distortions, directions_dict = get_all_distortions(sgn_hs, list(set(wyckoff_list)),
                                                                      directions, basis, origin)
@@ -323,10 +325,10 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
                         if s not in syms:
                             syms.append(s)
                 if len(syms) != len(this_amp):
-                    print("WARNING: irrep {} wyck {} has different number of params then amp components".format(irrep, wyck))
+                    logger.warning("WARNING: irrep {} wyck {} has different number of params then amp components".format(irrep, wyck))
                 sym_val_pairs = [(sym, val) for sym, val in zip(syms, this_amp)]
                 this_amp_conv = [round(float(el_sym.subs(sym_val_pairs)), 4) for el_sym in amp_sym]
-                print(irrep, wyck)
+                logger.info("{}  {}".format(irrep, wyck))
                 proj_data_by_wyck[wyck]['direction'] = get_amps_direction(sgn_hs, irrep, this_amp_conv, isos=isos)
             mode_decomposition_data[irrep] = proj_data_by_wyck
     if nonzero_only:
@@ -341,26 +343,32 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
     return mode_decomposition_data
 
 if __name__ == '__main__':
+    stream_handler = logging.StreamHandler()
+    if len(sys.argv) > 3:
+        if sys.argv[-1] == 'd':
+            stream_handler.setLevel(logging.DEBUG)
+    else:
+        stream_handler.setLevel(logging.INFO)
+    logger.addHandler(stream_handler)
+
     struct_hs = pmg.Structure.from_file(sys.argv[1])
     struct_ls = pmg.Structure.from_file(sys.argv[2])
 
     irrep_decomposition_data = get_mode_decomposition(struct_hs, struct_ls, nonzero_only=True)
 
-    print("Mode Definitions:")
+    logger.info("Mode Definitions:")
     for irrep, wycks in irrep_decomposition_data.items():
-        print(irrep)
+        logger.info(irrep)
         for wyck, data in wycks.items():
-            print('\t', wyck)
-            print('\t\t', data["direction"])
-            print('\t\t', data["dist_defs"])
-    print()
-    print()
-    print("Mode Amplitudes")
+            logger.info("\t{}".format(wyck))
+            logger.info("\t\t{}".format(data["direction"]))
+            logger.info("\t\t{}".format(data["dist_defs"]))
+    logger.info("Mode Amplitudes")
     for irrep, wycks in irrep_decomposition_data.items():
-        print(irrep)
+        logger.info(irrep)
         for wyck, data in wycks.items():
-            print('\t', wyck)
-            print('\t\t', data["direction"])
-            print('\t\t', np.round_(data["amplitudes"], decimals=5))
-            print('\t\t', np.round_(data["total_amplitude"], decimals=5))
-        # print(np.round_(data["Amplitudes_as"], decimals=5))
+            logger.info('\t{}'.format(wyck))
+            logger.info('\t\t{}'.format(data["direction"]))
+            logger.info('\t\t{}'.format(np.round_(data["amplitudes"], decimals=5)))
+            logger.info('\t\t{}'.format(np.round_(data["total_amplitude"], decimals=5)))
+        # logger.info(np.round_(data["Amplitudes_as"], decimals=5))
