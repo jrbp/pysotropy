@@ -440,7 +440,7 @@ def getDomains(parent, irrep, direction=None, setting=None, extra_shows=[], extr
             domains = isos.getDisplayData('ISOTROPY', raw=False)
     return domains
 
-def getDistortion(parent, wyckoffs, irrep, direction=None, cell=None,
+def getDistortion(parent, wyckoffs, irrep, direction=None, cell=None, k_params=None,
                   origin=None, domain=None, setting=None, isos=None):
     values = {'parent': parent,
               'wyckoff': ' '.join(wyckoffs),
@@ -452,6 +452,8 @@ def getDistortion(parent, wyckoffs, irrep, direction=None, cell=None,
     if domain is not None:
         # should consider throwing an exception if domain is given without direction
         values['domain'] = str(domain)
+    if k_params is not None:
+        values['kvalue'] = ','.join([str(len(k_params))] + k_params)
     # origin doesn't seem to alter output
     # if origin is not None:
     #     values['origin'] = ','.join([str(Fraction(i)) for i in origin])
@@ -462,6 +464,8 @@ def getDistortion(parent, wyckoffs, irrep, direction=None, cell=None,
         # isos.shows.clearAll()
         isos.shows.update(shows)
         dist = isos.getDisplayData('DISTORTION', raw=False)
+        if 'kvalue' in isos.values.keys():
+            del isos.values['kvalue']
     else:
         with IsotropySession(values, shows, setting=setting) as isos:
             dist = isos.getDisplayData('DISTORTION', raw=False)

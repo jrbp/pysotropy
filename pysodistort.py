@@ -74,14 +74,19 @@ def get_all_distortions(sgn_hs, wyckoff_list, directions, basis, origin):
     distortions = {}
     with iso.IsotropySession() as isos:
         for direct in directions:
-            if iso._kpt_has_params(direct['k vector']):
-                logger.warning("low sym kpoint not implemented yet skipping {}".format(direct))
-                #TODO: this can be easily implented by setting kvalue correctly using the value by getDirections
-                continue
+            k_params = None
+            if 'k params' in direct.keys():
+                kp = direct['k params']
+                if len(kp) > 0:
+                    if type(kp) is list:
+                        k_params = kp
+                    else:
+                        k_params = [kp]
             irrep = direct['Irrep']
             d = "vector,{}".format(','.join(direct['Dir']))
             this_dist = iso.getDistortion(sgn_hs, wyckoff_list,
-                                          irrep, cell=basis, origin=origin, direction=d, isos=isos)
+                                          irrep, cell=basis, origin=origin,
+                                          direction=d, k_params=k_params, isos=isos)
             if len(this_dist) > 0:
                 distortions[irrep] = this_dist
                 directions_dict[irrep] = direct['Dir']
