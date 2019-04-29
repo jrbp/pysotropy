@@ -183,6 +183,7 @@ def get_projection_data(displacements, wycks, struct_hs_supercell, high_sym_wyck
                 full_projvecs.append(pv)
             else:
                 full_projvecs.append([[0., 0., 0.] for i in range(num_proj_vecs)])
+        logger.debug(struct_hs_supercell.lattice)
         for i in range(num_proj_vecs):
             sum_cart_squares = 0.
             for pv in full_projvecs:
@@ -193,9 +194,14 @@ def get_projection_data(displacements, wycks, struct_hs_supercell, high_sym_wyck
                 amplitudes[i] += np.dot(disp, pv[i])
                 disp_cart = struct_hs_supercell.lattice.get_cartesian_coords(disp)
                 pv_cart = struct_hs_supercell.lattice.get_cartesian_coords(pv[i])
+                logger.debug('disp_frac: {}'.format(disp))
+                logger.debug('disp_cart: {}'.format(disp_cart))
+                logger.debug('pv_frac: {}'.format(pv[i]))
+                logger.debug('pv_cart: {}\n'.format(pv_cart))
                 amplitude_as_comps[i] += np.dot(norm_factor * disp_cart, pv_cart)
             amplitude_as = np.sqrt(np.sum([am**2 for am in amplitude_as_comps]))
             amplitude_ap = amplitude_as * np.sqrt(struct_hs.lattice.volume / struct_hs_supercell.lattice.volume)
+        logger.debug('amplitude_as_comps: {}\n'.format(amplitude_as_comps))
 
         results_by_wyck['{}{}'.format(wyck['Wyckoff'], n)] = {
             'amplitude_as': amplitude_as,
@@ -222,6 +228,7 @@ def get_amps_direction(parent, irrep, irrep_amp, isos=None):
     inequiv_dir_labels = [s['Dir'] for s in sym_inequiv]
     irrep_domains = {}
     for lbl in inequiv_dir_labels:
+        # TODO: put this in to the loop below so we don't request lower sym domains than needed
         these_domains = iso.getDomains(parent, irrep, lbl, isos=isos)
         these_domains[0]['Dir'] = these_domains[0]['Dir'][-1] # hacky fix
         irrep_domains[lbl] = these_domains
@@ -315,6 +322,7 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
     mode_decomposition_data = {}
     with iso.IsotropySession() as isos:
         for irrep, wycks in all_in_sc_basis.items():
+            logger.debug("GETTING PROJECTIONS FOR IRREP {}".format(irrep))
             proj_data_by_wyck = get_projection_data(displacements, wycks,
                                                     struct_hs_supercell, wyckoff_list, struct_hs)
             # TODO: clean this up, also don't find directions for irreps with amp==0
