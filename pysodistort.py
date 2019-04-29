@@ -199,9 +199,9 @@ def get_projection_data(displacements, wycks, struct_hs_supercell, high_sym_wyck
                 logger.debug('pv_frac: {}'.format(pv[i]))
                 logger.debug('pv_cart: {}\n'.format(pv_cart))
                 amplitude_as_comps[i] += np.dot(norm_factor * disp_cart, pv_cart)
-            amplitude_as = np.sqrt(np.sum([am**2 for am in amplitude_as_comps]))
-            amplitude_ap = amplitude_as * np.sqrt(struct_hs.lattice.volume / struct_hs_supercell.lattice.volume)
         logger.debug('amplitude_as_comps: {}\n'.format(amplitude_as_comps))
+        amplitude_as = np.sqrt(np.sum([am**2 for am in amplitude_as_comps]))
+        amplitude_ap = amplitude_as * np.sqrt(struct_hs.lattice.volume / struct_hs_supercell.lattice.volume)
 
         results_by_wyck['{}{}'.format(wyck['Wyckoff'], n)] = {
             'amplitude_as': amplitude_as,
