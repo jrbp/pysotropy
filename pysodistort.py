@@ -417,6 +417,7 @@ if __name__ == '__main__':
         for wyck, data in wycks.items():
             logger.info('\t{}'.format(wyck))
             logger.info('\t\t{}'.format(data["direction"]))
+            logger.info("\t\t"+", ".join( ["{}={}".format(sym, val) for sym, val in data["param_vals"]]))
             logger.info('\t\t{}'.format(np.round_(data["amplitudes"], decimals=5)))
             logger.info('\t\tAs: {}'.format(np.round_(data["amplitude_as"], decimals=5)))
             logger.info('\t\tAp: {}'.format(np.round_(data["amplitude_ap"], decimals=5)))
