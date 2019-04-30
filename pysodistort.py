@@ -220,8 +220,9 @@ def get_projection_data(displacements, wycks, struct_hs_supercell, high_sym_wyck
 
         results_by_wyck['{}{}'.format(wyck['Wyckoff'], n)] = {
             'amplitude_as': amplitude_as,
+            'amplitude_as_comps': amplitude_as_comps,
             'amplitude_ap': amplitude_ap,
-            'amplitudes': amplitudes,
+            'amplitudes': amplitude_as_comps, #TODO: CLEAN THIS UP IF IT DOES WHAT WE WANT!
             'dist_defs': dist_defs,
             'full_projvecs': full_projvecs,
             'num_proj_vecs': num_proj_vecs,
