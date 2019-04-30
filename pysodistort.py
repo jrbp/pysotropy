@@ -6,11 +6,13 @@ import numpy as np
 import pymatgen as pmg
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.analysis.structure_matcher import StructureMatcher
+from wanpol import ModifiedSM_I
 import pysotropy as iso
 from sympy import sympify, linsolve, EmptySet
 from sympy.parsing.sympy_parser import (parse_expr, standard_transformations,
                                         implicit_multiplication_application)
-logger = logging.getLogger("pysotropy")
+# logger = logging.getLogger("pysotropy")
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 transformations = (standard_transformations + (implicit_multiplication_application,))
 
@@ -122,6 +124,7 @@ def convert_distortions_basis(distortions, origin,
                                                  decimals=5))
                     this_sites_vcs.append(vc_sc_basis)
                 wyck_sc["Projected Vectors"].append(this_sites_vcs)
+            wyck_sc["Projected Vectors"] = np.round(wyck_sc["Projected Vectors"] / abs(np.array(wyck_sc["Projected Vectors"])).max(), 5)
             irreps[irrep].append(wyck_sc)
     return irreps
 
@@ -157,15 +160,24 @@ def get_distortion_dec_struct(wycks, struct_to_match, high_sym_wyckoff, struct_h
     dist_struct = pmg.Structure(lat, species, coords, site_properties={"projvecs": proj_vecs})
     logger.debug("dist_struct:\n{}".format(dist_struct))
 
-    sm_dist = StructureMatcher(ltol = 0.02, primitive_cell=False, allow_subset=True)
+    # sm_dist = StructureMatcher(ltol = 0.02, primitive_cell=False, allow_subset=True)
+    sm_dist = ModifiedSM_I(ltol = 0.02, primitive_cell=False, allow_subset=True)
     try:
         sc_d, trans_d, mapping = sm_dist.get_transformation(struct_to_match, dist_struct)
     except TypeError:
         logger.warning("couldn't map dist decorated structure to actual structure")
         logger.warning("dist dec struct:\n{}".format(dist_struct))
         logger.warning("struct to match:\n{}".format(struct_to_match))
+    logger.debug("matching dist def to struct")
     dist_struct_matched = dist_struct * sc_d
     dist_struct_matched.translate_sites(list(range(len(dist_struct_matched))), trans_d)
+    logger.debug(struct_to_match)
+    logger.debug(dist_struct)
+    logger.debug(sc_d)
+    logger.debug(trans_d)
+    logger.debug(mapping)
+    logger.debug(dist_struct_matched)
+    logger.debug("\n")
     return dist_struct_matched, mapping
 
 def get_projection_data(displacements, wycks, struct_hs_supercell, high_sym_wyckoff, struct_hs):
@@ -191,13 +203,16 @@ def get_projection_data(displacements, wycks, struct_hs_supercell, high_sym_wyck
                 sum_cart_squares += pv_cart.dot(pv_cart)
             norm_factor = sum_cart_squares**(-1/2)
             for disp, pv in zip(displacements, full_projvecs):
+                logger.debug(i)
+                logger.debug('frac dot prod{}'.format(np.dot(disp, pv[i])))
                 amplitudes[i] += np.dot(disp, pv[i])
                 disp_cart = struct_hs_supercell.lattice.get_cartesian_coords(disp)
                 pv_cart = struct_hs_supercell.lattice.get_cartesian_coords(pv[i])
+                logger.debug('cart dot prod{}'.format(np.dot(norm_factor * disp_cart, pv_cart)))
                 logger.debug('disp_frac: {}'.format(disp))
                 logger.debug('disp_cart: {}'.format(disp_cart))
                 logger.debug('pv_frac: {}'.format(pv[i]))
-                logger.debug('pv_cart: {}\n'.format(pv_cart))
+                logger.debug('pv_cart: {}\n\n'.format(pv_cart))
                 amplitude_as_comps[i] += np.dot(norm_factor * disp_cart, pv_cart)
         logger.debug('amplitude_as_comps: {}\n'.format(amplitude_as_comps))
         amplitude_as = np.sqrt(np.sum([am**2 for am in amplitude_as_comps]))
@@ -376,6 +391,11 @@ if __name__ == '__main__':
     else:
         stream_handler.setLevel(logging.INFO)
     logger.addHandler(stream_handler)
+
+    logfile = "pysodistort.log"
+    file_handler = logging.FileHandler(filename=logfile, mode='w')
+    file_handler.setLevel(logging.DEBUG)
+    logger.addHandler(file_handler)
 
     struct_hs = pmg.Structure.from_file(sys.argv[1])
     struct_ls = pmg.Structure.from_file(sys.argv[2])
