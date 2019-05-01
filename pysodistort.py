@@ -394,7 +394,7 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
             tot_amp = 0.
             for wyck, data in wycks.items():
                  tot_amp += np.sum(np.abs(data['amplitudes']))
-            if tot_amp > 1e-5:
+            if tot_amp > 1e-4:
                 nonzero_mode_decomp[irrep] = wycks
         return nonzero_mode_decomp
     return mode_decomposition_data
