@@ -312,6 +312,13 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
 
     basis, origin, displacements, struct_hs_supercell = match_structures(struct_ls, struct_hs)
 
+    logger.debug("Undistorted Superstructure:")
+    logger.debug(struct_hs_supercell)
+    logger.debug("\n")
+    logger.debug("Distorted Structure:")
+    logger.debug(struct_ls)
+    logger.debug("\n")
+
     try:
         directions = iso.getDirections(sgn_hs, basis, origin, subgroup=sgn_ls)
     except iso.IsotropyBasisException:
