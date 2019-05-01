@@ -69,7 +69,7 @@ def match_structures(s1, s2, scale_lattice=False, rh_only=True):
         for aligned, rot, scale in hs_lat.find_all_mappings(hs_std):
             if (abs(aligned.matrix - hs_lat.matrix) < 1.e-3).all():
                 strained_hs_lattice = pmg.Lattice(np.inner(ls_std.matrix, rot))
-        struct_hs_supercell = pmg.Structure(strained_hs_lattice
+        struct_hs_supercell = pmg.Structure(strained_hs_lattice,
                                             struct_hs_supercell.species,
                                             [site.frac_coords for site in struct_hs_supercell])
     displacements = []
