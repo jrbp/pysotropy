@@ -382,10 +382,10 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
                 # TODO: really seperate components properly and give seperate amplitudes for each freee param
                 # currently As and Ap will only be right with one free param
                 # otherwise they will be both mixed together and sign will be always positive
-                if len(var_vals) == 1:
-                    sign = float(var_vals[0][1] / abs(var_vals[0][1]))
-                    proj_data_by_wyck[wyck]['amplitude_as'] = sign * proj_data_by_wyck[wyck]['amplitude_as']
-                    proj_data_by_wyck[wyck]['amplitude_ap'] = sign * proj_data_by_wyck[wyck]['amplitude_ap']
+                # if len(var_vals) == 1:
+                #     sign = float(var_vals[0][1] / abs(var_vals[0][1]))
+                #     proj_data_by_wyck[wyck]['amplitude_as'] = sign * proj_data_by_wyck[wyck]['amplitude_as']
+                #     proj_data_by_wyck[wyck]['amplitude_ap'] = sign * proj_data_by_wyck[wyck]['amplitude_ap']
                 proj_data_by_wyck[wyck]['param_vals'] = var_vals
             mode_decomposition_data[irrep] = proj_data_by_wyck
     if nonzero_only:
