@@ -285,12 +285,13 @@ def get_amps_direction(parent, irrep, irrep_amp, isos=None):
             return lbl, ddir, var_vals
 
 
-def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_direction=True):
+def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_direction=True, amp_cut=1.e-4):
     """
     Args
         struct_hs: high symmetry structure (pymatgen structure)
         struct_ls: low symmetry structure (pymatgen structure)
-        nonzero_only (optional): only return modes which have nonzero amplitude TODO: make this a cutoff
+        nonzero_only (optional): only return modes which have nonzero amplitude
+        amp_cut (optional): min amplitude to return if nonzero_only
     Returns
         dict containing mode_decomposition_data
         {irrep:
@@ -394,7 +395,7 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
             tot_amp = 0.
             for wyck, data in wycks.items():
                  tot_amp += np.sum(np.abs(data['amplitudes']))
-            if tot_amp > 1e-4:
+            if tot_amp > amp_cut:
                 nonzero_mode_decomp[irrep] = wycks
         return nonzero_mode_decomp
     return mode_decomposition_data
