@@ -51,7 +51,7 @@ def match_structures(s1, s2, scale_lattice=False, rh_only=True):
         displacements
         high_sym_supercell
 """
-    sm = StructureMatcher(attempt_supercell=True, primitive_cell=False)
+    sm = StructureMatcher(ltol=0.3, stol=0.3, angle_tol=15, scale=True, attempt_supercell=True, primitive_cell=False)
     basis, origin, mapping = sm.get_transformation(s1, s2, rh_only=rh_only)
 
     struct_hs_supercell = sm.get_s2_like_s1(s1, s2, rh_only=rh_only)
