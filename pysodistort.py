@@ -362,7 +362,7 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
             for wyck in proj_data_by_wyck.keys():
                 this_amp = proj_data_by_wyck[wyck]['amplitudes']
                 # temporary work around until cleaned up properly
-                if np.sum(np.abs(this_amp)) < 1e-6:
+                if np.sum(np.abs(this_amp)) < amp_cut:
                     proj_data_by_wyck[wyck]['direction'] = ('zero', [0.,0.,0.])
                     continue
                 syms = []
