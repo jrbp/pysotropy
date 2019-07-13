@@ -231,6 +231,22 @@ class IsotropySession:
             this_line = self.read_iso_line()
             if this_line in ['*', '']:  # if there is no output '' is returned above
                 keep_reading = False
+            elif re.match(".*You have requested information about .*", this_line):
+                self.read_iso_line() # read past irrep:...
+                self.read_iso_line() # read past The data base for these...
+                self.read_iso_line() # read past Should this...
+                self.read_iso_line() # read past Enter RETURN
+                self.sendCommand("")
+                self.read_iso_line() # read past Adding
+                for i in range(10):
+                    possibly_blank = self.read_iso_line()
+                    if not (possibly_blank in ['*', '']):  # if there is no output '' is returned above
+                        logger.debug("moved past data base prompt, adding results")
+                        lines.append(possibly_blank)
+                        break
+                    else:
+                        if i == 9:
+                            logger.debug("moved past data base prompt, no results")
             elif re.match(".*Data base for these coupled subgroups .*", this_line):
                 self.read_iso_line() # read past Should this...
                 self.read_iso_line() # read past Enter RETURN
@@ -397,7 +413,7 @@ def getDirections(spacegroup, basis, origin, subgroup=None, setting=None, extra_
     if extra_shows is not None:
         shows += extra_shows
     with IsotropySession(values, shows, setting=setting) as isos:
-        directions = isos.getDisplayData('DIRECTION', delay=0.01)
+        directions = isos.getDisplayData('DIRECTION', delay=0.1)
     return directions
 
 def getRepresentations(spacegroup, kpoint_label, irreps=None, setting=None):
@@ -421,9 +437,13 @@ def getRepresentations(spacegroup, kpoint_label, irreps=None, setting=None):
             irrep_dict[irrep] = mat_list
     return irrep_dict
 
-def getDomains(parent, irrep, direction=None, setting=None, extra_shows=[], extra_values={}, isos=None):
+def getDomains(parent, irrep, direction=None, setting=None, extra_shows=[], extra_values={}, isos=None, k_params=None):
     values = {'parent': parent,
               'irrep': irrep,}
+    delay=None
+    if k_params is not None:
+        values['kvalue'] = ','.join([str(len(k_params))] + k_params)
+        delay=1
     if direction is not None:
         values['direction'] = direction
     shows = ['direction vector', 'domains', 'subgroup', 'distinct']
@@ -434,10 +454,10 @@ def getDomains(parent, irrep, direction=None, setting=None, extra_shows=[], extr
         isos.shows.update(shows)
         # isos.values.clearAll()
         isos.values.update(values)
-        domains = isos.getDisplayData('ISOTROPY', raw=False)
+        domains = isos.getDisplayData('ISOTROPY', raw=False, delay=delay)
     else:
         with IsotropySession(values, shows, setting=setting) as isos:
-            domains = isos.getDisplayData('ISOTROPY', raw=False)
+            domains = isos.getDisplayData('ISOTROPY', raw=False, delay=delay)
     return domains
 
 def getDistortion(parent, wyckoffs, irrep, direction=None, cell=None, k_params=None,

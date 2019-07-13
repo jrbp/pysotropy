@@ -16,6 +16,13 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 transformations = (standard_transformations + (implicit_multiplication_application,))
 
+class TooManyDomains(Exception):
+    """Raised when Isotropy Bombs"""
+    pass
+
+class OtherDirectionError(Exception):
+    """Raised when Isotropy Bombs"""
+    pass
 
 def frac_vec_convert(vec, lat1, lat2):
     """convert from frac coords of lat 1 to frac coords of lat2"""
@@ -96,6 +103,9 @@ def get_all_distortions(sgn_hs, wyckoff_list, directions, basis, origin):
             this_dist = iso.getDistortion(sgn_hs, wyckoff_list,
                                           irrep, cell=basis, origin=origin,
                                           direction=d, k_params=k_params, isos=isos)
+            if k_params is not None:
+                for wyck in this_dist:
+                    wyck['k_params'] = k_params
             if len(this_dist) > 0:
                 distortions[irrep] = this_dist
                 directions_dict[irrep] = direct['Dir']
@@ -110,6 +120,8 @@ def convert_distortions_basis(distortions, origin,
             wyck_sc = {"Wyckoff": wyck["Wyckoff"],
                        "Point": [],
                        "Projected Vectors": []}
+            if 'k_params' in wyck.keys():
+                wyck_sc['k_params'] = wyck['k_params']
     
             # need to check if we have only one site
             if type(wyck["Point"][0]) is not list:
@@ -236,10 +248,12 @@ def get_projection_data(displacements, wycks, struct_hs_supercell, high_sym_wyck
             'num_proj_vecs': num_proj_vecs,
             'total_amplitude': np.sqrt(np.sum([a**2
                                                for a in amplitudes]))}
+        if 'k_params' in wyck.keys():
+            results_by_wyck['{}{}'.format(wyck['Wyckoff'], n)]['k_params'] = wyck['k_params']
     return results_by_wyck
 
 
-def get_amps_direction(parent, irrep, irrep_amp, isos=None):
+def get_amps_direction(parent, irrep, irrep_amp, isos=None, k_params=None):
     if isos is None:
         close_after = True
         isos = iso.IsotropySession()
@@ -247,13 +261,21 @@ def get_amps_direction(parent, irrep, irrep_amp, isos=None):
         close_after = False
     isos.values.update({'parent': parent, 'irrep': irrep})
     isos.shows.update({'direction', 'subgroup'})
-    sym_inequiv = isos.getDisplayData('ISOTROPY')
+    delay=None
+    if k_params is not None:
+        isos.values['kvalue'] = ','.join([str(len(k_params))] + k_params)
+        delay=1
+    sym_inequiv = isos.getDisplayData('ISOTROPY', delay=delay)
     isos.shows.clearAll()
     inequiv_dir_labels = [s['Dir'] for s in sym_inequiv]
     irrep_domains = {}
     for lbl in inequiv_dir_labels:
         # TODO: put this in to the loop below so we don't request lower sym domains than needed
-        these_domains = iso.getDomains(parent, irrep, lbl, isos=isos)
+        these_domains = iso.getDomains(parent, irrep, lbl, isos=isos, k_params=k_params)
+        too_many_domains = False
+        if len(these_domains) > 300:
+            break # Sorry future me
+            too_many_domains = True
         these_domains[0]['Dir'] = these_domains[0]['Dir'][-1] # hacky fix
         irrep_domains[lbl] = these_domains
     isos.shows.clearAll()
@@ -283,6 +305,11 @@ def get_amps_direction(parent, irrep, irrep_amp, isos=None):
             var_vals = list(zip([str(s) for s in syms], list(soln)[0]))
             logger.debug(var_vals)
             return lbl, ddir, var_vals
+    try:
+        if too_many_domains:
+            raise TooManyDomains()
+    except Exception:
+        raise OtherDirectionError()
 
 
 def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_direction=True, amp_cut=1.e-4):
@@ -378,7 +405,25 @@ def get_mode_decomposition(struct_hs, struct_ls, nonzero_only=False, general_dir
                 sym_val_pairs = [(sym, val) for sym, val in zip(syms, this_amp)]
                 this_amp_conv = [round(float(el_sym.subs(sym_val_pairs)), 4) for el_sym in amp_sym]
                 logger.info("{}  {}".format(irrep, wyck))
-                dir_lbl, dir_vec, var_vals = get_amps_direction(sgn_hs, irrep, this_amp_conv, isos=isos)
+                k_params = None
+                if 'k_params' in proj_data_by_wyck[wyck].keys():
+                    logger.info("setting k params")
+                    k_params = proj_data_by_wyck[wyck]['k_params']
+                    logger.info(k_params)
+                try:
+                    dir_lbl, dir_vec, var_vals = get_amps_direction(sgn_hs, irrep, this_amp_conv, isos=isos, k_params=k_params)
+                except TooManyDomains:
+                    logger.warning("couldn't find direction for {}, due to too many domains".format(irrep, wyck))
+                    dir_lbl, dir_vec, var_vals = "n/a", "n/a", "n/a"
+                except OtherDirectionError:
+                    dir_lbl, dir_vec, var_vals = "n/a", "n/a", "n/a"
+                    logger.warning("couldn't find direction for {} {}, no initial directions".format(irrep, wyck))
+                except KeyError:
+                    dir_lbl, dir_vec, var_vals = "n/a", "n/a", "n/a"
+                    logger.warning("couldn't find direction for {} {}, likely a isotropy parsing issue".format(irrep, wyck))
+                except Exception:
+                    dir_lbl, dir_vec, var_vals = "n/a", "n/a", "n/a"
+                    logger.warning("couldn't find direction for {} {}".format(irrep, wyck))
                 proj_data_by_wyck[wyck]['direction'] = (dir_lbl, dir_vec)
                 # TODO: really seperate components properly and give seperate amplitudes for each freee param
                 # currently As and Ap will only be right with one free param
