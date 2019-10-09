@@ -20,7 +20,9 @@ results are parsed in to a list of python dictionaries.
 This requires some knowledge of how to use the command line tool itself, but is
 the basis for how other functionality is built.
 
-Simple example: obtain the irrep and direction involved in a distortion which
+Simple example:
+
+obtain the irrep and direction involved in a distortion which
 changes the space group from 221 to 99.
 #+BEGIN_SRC ipython :session :ipyfile :exports :results output drawer :async t :pydir /home/john/.tmp-obpy
 import pysotropy as iso
@@ -39,10 +41,93 @@ Direction: ['P1', ['a', '0', '0']]
 #+END_EXAMPLE
 
 
-* pysodistort for finding symmetry
+* pysodistort
 
 Preform the tasks of the isodistort online tool using pymatgen structure
 objects, including mode decomposition of the distortion between a high symmetry
 and low symmetry crystal.
 
 Very much a work in progress, but has been useful to me already.
+
+Simple (artificial) example on finding modes of a distorted perovskite:
+
+#+BEGIN_SRC ipython :session :ipyfile :exports :results output drawer :async t :pydir /home/john/.tmp-obpy
+import pymatgen as pmg
+import pysodistort as psd
+
+cubic_structure = pmg.Structure(pmg.Lattice.cubic(4.0), species=['Sr', 'Ti', 'O', 'O', 'O'],
+                            coords=[[0., 0., 0.],
+                                    [0.5, 0.5, 0.5],
+                                    [0.5, 0.5, 0.],
+                                    [0.5, 0., 0.5],
+                                    [0., 0.5, 0.5]])
+
+distorted_structure = pmg.Structure(pmg.Lattice.tetragonal(4.0, 8.0),
+                                    species=['Sr', 'Sr', 'Ti', 'Ti', 'O', 'O', 'O', 'O', 'O', 'O'],
+                                    coords=[[0., 0., 0.],
+                                            [0.0, 0.0, 0.5],
+                                            [0.5, 0.5, 0.2],
+                                            [0.5, 0.5, 0.8],
+                                            [0.5, 0.5, 0.],
+                                            [0.5, 0.5, 0.5],
+                                            [0.5, 0., 0.28],
+                                            [0.5, 0., 0.72],
+                                            [0., 0.5, 0.28],
+                                            [0., 0.5, 0.72]])
+distortion = psd.get_mode_decomposition(cubic_structure, distorted_structure, nonzero_only=True)
+print("Mode Definitions:")
+for irrep, wycks in distortion.items():
+    print(irrep)
+    for wyck, data in wycks.items():
+        print("\t{}".format(wyck))
+        print("\t\t{}".format(data["direction"]))
+        print("\t\t{}".format(data["dist_defs"]))
+print("Mode Amplitudes")
+for irrep, wycks in distortion.items():
+    print(irrep)
+    for wyck, data in wycks.items():
+        print('\t{}'.format(wyck))
+        print('\t\t{}'.format(data["direction"]))
+        # print("\t\t"+", ".join( ["{}={}".format(sym, val) for sym, val in data["param_vals"]]))
+        print('\t\t{}'.format(np.round_(data["amplitudes"], decimals=5)))
+#+END_SRC
+
+
+#+begin_example
+Mode Definitions:
+X1+
+	b0
+		('P1', ['0', '0', 'a'])
+		Full Formula (Ti2)
+Reduced Formula: Ti
+abc   :   4.000000   4.000000   8.000000
+angles:  90.000000  90.000000  90.000000
+Sites (2)
+  #  SP      a    b     c  projvecs
+---  ----  ---  ---  ----  ---------------
+  0  Ti    0.5  0.5  0.25  [[0. 0. 1.]]
+  1  Ti    0.5  0.5  0.75  [[ 0.  0. -1.]]
+	c1
+		('P1', ['0', '0', 'a'])
+		Full Formula (O6)
+Reduced Formula: O2
+abc   :   4.000000   4.000000   8.000000
+angles:  90.000000  90.000000  90.000000
+Sites (6)
+  #  SP      a    b     c  projvecs
+---  ----  ---  ---  ----  ---------------
+  0  O     0    0.5  0.25  [[0. 0. 1.]]
+  1  O     0    0.5  0.75  [[ 0.  0. -1.]]
+  2  O     0.5  0.5  0     [[0. 0. 0.]]
+  3  O     0.5  0.5  0.5   [[0. 0. 0.]]
+  4  O     0.5  0    0.25  [[0. 0. 1.]]
+  5  O     0.5  0    0.75  [[ 0.  0. -1.]]
+Mode Amplitudes
+X1+
+	b0
+		('P1', ['0', '0', 'a'])
+		[0.56569]
+	c1
+		('P1', ['0', '0', 'a'])
+		[-0.48]
+#+end_example
