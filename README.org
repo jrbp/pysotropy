@@ -8,16 +8,17 @@ analysis of crystalline solids.
 
 Obtain the ISOTROPY for linux executable [[https://stokes.byu.edu/iso/isolinux.php][here]].
 
-If you use this tool in publishing a paper yous hould cite:
+If you use this tool in publishing a paper you should cite:
 #+begin_example
 H. T. Stokes, D. M. Hatch, and B. J. Campbell, ISOTROPY Software Suite, iso.byu.edu.
 #+end_example
 I am not affiliated with the ISOTROPY authors, but their
-tool is being used "under the hood" and they should be credited appropiately.
+tool is being used "under the hood" and they should be credited appropriately.
 
 
-* As a simple wrapper
+* pysotropy
 
+** As a simple wrapper
 When used as a simple wrapper commands can be passed to the isotropy program and
 results are parsed in to a list of python dictionaries.
 
@@ -44,6 +45,38 @@ Irrep: GM4-
 Direction: ['P1', ['a', '0', '0']]
 #+END_EXAMPLE
 
+** convenient functions
+#+BEGIN_SRC ipython :session :ipyfile :exports :results output drawer :async t :pydir /home/john/.tmp-obpy
+from prettytable import PrettyTable
+import pysotropy as iso
+distortion = iso.getDistortion(parent=221, wyckoffs=['a', 'b', 'c'], irrep='R4-', direction='P1')
+
+for wyckoff in distortion:
+    print('Wyckoff: {}'.format(wyckoff['Wyckoff']))
+    pt = PrettyTable()
+    pt.add_column('Point', wyckoff['Point'])
+    pt.add_column('Displacement Vector', wyckoff['Projected Vectors'])
+    print(pt)
+#+END_SRC
+
+Wyckoff: a
++-----------------+---------------------+
+|      Point      | Displacement Vector |
++-----------------+---------------------+
+| ['0', '0', '0'] |   ['0', '0', '1']   |
+| ['0', '0', '1'] |   ['0', '0', '-1']  |
++-----------------+---------------------+
+Wyckoff: c
++---------------------+---------------------+
+|        Point        | Displacement Vector |
++---------------------+---------------------+
+| ['0', '1/2', '1/2'] |   ['0', '2', '0']   |
+| ['0', '1/2', '3/2'] |   ['0', '-2', '0']  |
+| ['1/2', '1/2', '0'] |   ['0', '0', '0']   |
+| ['1/2', '1/2', '1'] |   ['0', '0', '0']   |
+| ['1/2', '0', '1/2'] |   ['2', '0', '0']   |
+| ['1/2', '0', '3/2'] |   ['-2', '0', '0']  |
++---------------------+---------------------+
 
 * pysodistort
 
