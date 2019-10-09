@@ -1,5 +1,5 @@
-#+TITLE: README
-* Python Interface to ISOTROPY for linux
+#+TITLE: Python Interface to ISOTROPY for linux
+
 Preform the various tasks possible with the excellent
 ISOTROPY tool in an automated fashion using python.
 
