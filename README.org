@@ -20,8 +20,8 @@ results are parsed in to a list of python dictionaries.
 This requires some knowledge of how to use the command line tool itself, but is
 the basis for how other functionality is built.
 
-Obtain the possible irreps and their directions involved in a particular
-symmetry lowering phase transition:
+Simple example: obtain the irrep and direction involved in a distortion which
+changes the space group from 221 to 99.
 #+BEGIN_SRC ipython :session :ipyfile :exports :results output drawer :async t :pydir /home/john/.tmp-obpy
 import pysotropy as iso
 
@@ -29,27 +29,12 @@ values = {'parent': 221, 'subgroup': 99}
 shows = ['irrep', 'direction vector']
 with iso.IsotropySession(values, shows) as isos:
     irreps = isos.getDisplayData('ISOTROPY')
-print(results)
+print('Irrep: {}'.format(irreps[0]['Irrep']))
+print('Direction: {}'.format(irreps[0]['Dir']))
 #+END_SRC
 
-[{'Wyckoff': 'a', 'Point': ['0', '0', '0'], 'Projected Vectors': [['1', '0', '0'], ['0', '1', '0'], ['0', '0', '1']]}, {'Wyckoff': 'b', 'Point': ['1/2', '1/2', '1/2'], 'Projected Vectors': [['1', '0', '0'], ['0', '1', '0'], ['0', '0', '1']]}, {'Wyckoff': 'c', 'Point': [['0', '1/2', '1/2'], ['1/2', '1/2', '0'], ['1/2', '0', '1/2']], 'Projected Vectors': [[['1', '0', '0'], ['0', '0', '0'], ['0', '0', '0']], [['0', '0', '0'], ['0', '0', '0'], ['0', '0', '1']], [['0', '0', '0'], ['0', '1', '0'], ['0', '0', '0']]]}, {'Wyckoff': 'c', 'Point': [['0', '1/2', '1/2'], ['1/2', '1/2', '0'], ['1/2', '0', '1/2']], 'Projected Vectors': [[['0', '0', '0'], ['0', '2', '0'], ['0', '0', '2']], [['2', '0', '0'], ['0', '2', '0'], ['0', '0', '0']], [['2', '0', '0'], ['0', '0', '0'], ['0', '0', '2']]]}]
-
-#+BEGIN_SRC ipython :session :ipyfile :exports :results output drawer :async t :pydir /home/john/.tmp-obpy
-values = {'parent': 221,
-          'wyckoff': 'a b c',
-          'irrep': irreps[0]['Irrep'],
-          }
-shows = ['basis', 'wyckoff', 'microscopic vector']
-with iso.IsotropySession(values, shows) as isos:
-    distortion =  isos.getDisplayData('DISTORTION')
-for wyck in distortion:
-    print(wyck)
-#+END_SRC
-
-{'Wyckoff': 'a', 'Point': ['0', '0', '0'], 'Projected Vectors': [['1', '0', '0'], ['0', '1', '0'], ['0', '0', '1']]}
-{'Wyckoff': 'b', 'Point': ['1/2', '1/2', '1/2'], 'Projected Vectors': [['1', '0', '0'], ['0', '1', '0'], ['0', '0', '1']]}
-{'Wyckoff': 'c', 'Point': [['0', '1/2', '1/2'], ['1/2', '1/2', '0'], ['1/2', '0', '1/2']], 'Projected Vectors': [[['1', '0', '0'], ['0', '0', '0'], ['0', '0', '0']], [['0', '0', '0'], ['0', '0', '0'], ['0', '0', '1']], [['0', '0', '0'], ['0', '1', '0'], ['0', '0', '0']]]}
-{'Wyckoff': 'c', 'Point': [['0', '1/2', '1/2'], ['1/2', '1/2', '0'], ['1/2', '0', '1/2']], 'Projected Vectors': [[['0', '0', '0'], ['0', '2', '0'], ['0', '0', '2']], [['2', '0', '0'], ['0', '2', '0'], ['0', '0', '0']], [['2', '0', '0'], ['0', '0', '0'], ['0', '0', '2']]]}
+Irrep: GM4-
+Direction: ['P1', ['a', '0', '0']]
 
 
 * pysodistort for finding symmetry
