@@ -7,8 +7,12 @@ The software can preform various tasks applying group theoretical methods to the
 analysis of crystalline solids.
 
 Obtain the ISOTROPY for linux executable [[https://stokes.byu.edu/iso/isolinux.php][here]].
-One should cite "H. T. Stokes, D. M. Hatch, and B. J. Campbell, ISOTROPY Software Suite, iso.byu.edu."
-if you use this tool. I am not affiliated with the ISOTROPY authors, but their
+
+If you use this tool in publishing a paper yous hould cite:
+#+begin_example
+H. T. Stokes, D. M. Hatch, and B. J. Campbell, ISOTROPY Software Suite, iso.byu.edu.
+#+end_example
+I am not affiliated with the ISOTROPY authors, but their
 tool is being used "under the hood" and they should be credited appropiately.
 
 
