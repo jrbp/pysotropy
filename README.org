@@ -88,7 +88,6 @@ for irrep, wycks in distortion.items():
     for wyck, data in wycks.items():
         print('\t{}'.format(wyck))
         print('\t\t{}'.format(data["direction"]))
-        # print("\t\t"+", ".join( ["{}={}".format(sym, val) for sym, val in data["param_vals"]]))
         print('\t\t{}'.format(np.round_(data["amplitudes"], decimals=5)))
 #+END_SRC
 
