@@ -59,6 +59,7 @@ for wyckoff in distortion:
     print(pt)
 #+END_SRC
 
+#+begin_example
 Wyckoff: a
 +-----------------+---------------------+
 |      Point      | Displacement Vector |
@@ -77,6 +78,7 @@ Wyckoff: c
 | ['1/2', '0', '1/2'] |   ['2', '0', '0']   |
 | ['1/2', '0', '3/2'] |   ['-2', '0', '0']  |
 +---------------------+---------------------+
+#+end_example
 
 * pysodistort
 
