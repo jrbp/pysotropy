@@ -33,8 +33,10 @@ print('Irrep: {}'.format(irreps[0]['Irrep']))
 print('Direction: {}'.format(irreps[0]['Dir']))
 #+END_SRC
 
+#+BEGIN_EXAMPLE
 Irrep: GM4-
 Direction: ['P1', ['a', '0', '0']]
+#+END_EXAMPLE
 
 
 * pysodistort for finding symmetry
