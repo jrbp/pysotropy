@@ -91,6 +91,7 @@ Very much a work in progress, but has been useful to me already.
 Simple (artificial) example on finding modes of a distorted perovskite:
 
 #+BEGIN_SRC ipython :session :ipyfile :exports :results output drawer :async t :pydir /home/john/.tmp-obpy
+import numpy as np
 import pymatgen as pmg
 import pysodistort as psd
 
