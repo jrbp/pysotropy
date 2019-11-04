@@ -6,7 +6,7 @@ import numpy as np
 import pymatgen as pmg
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.analysis.structure_matcher import StructureMatcher
-from wanpol import ModifiedSM_I
+from pymatgen.optimization.linear_assignment import LinearAssignment
 import pysotropy as iso
 from sympy import sympify, linsolve, EmptySet
 from sympy.parsing.sympy_parser import (parse_expr, standard_transformations,
@@ -45,6 +45,81 @@ def get_sym_info(struct):
     sgn = sga.get_space_group_number()
     wyckoff = sga.get_symmetry_dataset()['wyckoffs']
     return sgn, wyckoff
+
+
+class ModifiedSM_I(StructureMatcher):
+    # def _strict_match(self, struct1, struct2, fu, s1_supercell=True,
+    #           use_rms=True, break_on_match=False):
+    def _strict_match(self, struct1, struct2, fu, s1_supercell=True,
+                      use_rms=False, break_on_match=False, rh_only=False):
+        """
+        Matches struct2 onto struct1 (which should contain all sites in
+        struct2).
+
+        This modified version enforces that all transformations done to the structure
+        have a rotation matrix which is the identity (only translations are allowed).
+        This is used as a quick way to make sites match up, other means should probably be used.
+
+        Args:
+        struct1, struct2 (Structure): structures to be matched
+        fu (int): size of supercell to create
+        s1_supercell (bool): whether to create the supercell of
+            struct1 (vs struct2)
+        use_rms (bool): whether to minimize the rms of the matching
+        break_on_match (bool): whether to stop search at first
+            valid match
+        """
+        if fu < 1:
+            raise ValueError("fu cannot be less than 1")
+
+        mask, s1_t_inds, s2_t_ind = self._get_mask(struct1, struct2,
+                                                   fu, s1_supercell)
+
+        if mask.shape[0] > mask.shape[1]:
+            raise ValueError('after supercell creation, struct1 must '
+                             'have more sites than struct2')
+
+        # check that a valid mapping exists
+        if not self._subset and mask.shape[1] != mask.shape[0]:
+            return None
+
+        if LinearAssignment(mask).min_cost > 0:
+            return None
+
+        best_match = None
+        # loop over all lattices
+        for s1fc, s2fc, avg_l, sc_m in \
+                self._get_supercells(struct1, struct2, fu, s1_supercell):
+
+            if not (sc_m==np.identity(3)).all():
+            #if not (sc_m[-1]==np.identity(3)[-1]).all():
+                continue
+
+            # compute fractional tolerance
+            normalization = (len(s1fc) / avg_l.volume) ** (1/3)
+            inv_abc = np.array(avg_l.reciprocal_lattice.abc)
+            frac_tol = inv_abc * self.stol / (np.pi * normalization)
+            # loop over all translations
+            for s1i in s1_t_inds:
+                t = s1fc[s1i] - s2fc[s2_t_ind]
+                t_s2fc = s2fc + t
+                if self._cmp_fstruct(s1fc, t_s2fc, frac_tol, mask):
+                    dist, t_adj, mapping = self._cart_dists(
+                        s1fc, t_s2fc, avg_l, mask, normalization, frac_tol)
+                    if use_rms:
+                        val = np.linalg.norm(dist) / len(dist) ** 0.5
+                    else:
+                        val = max(dist)
+                    if best_match is None or val < best_match[0]:
+                        total_t = t + t_adj
+                        total_t -= np.round(total_t)
+                        best_match = val, dist, sc_m, total_t, mapping
+                        if (break_on_match or val < 1e-5) and val < self.stol:
+                            return best_match
+
+        if best_match and best_match[0] < self.stol:
+            return best_match
+
 
 def match_structures(s1, s2, scale_lattice=False, rh_only=True):
     """
