@@ -150,15 +150,17 @@ class IsotropySession:
             for now the setting options can only be set
             when creating an Isotropy object, not changed later
         """
-        iso_location = "/home/john/scripts/isobyu/"  # TODO: don't hard code
+        iso_location = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'iso/')
         logger.debug("""starting isotropy session in {}
                         using isotropy in: {}""".format(
                             os.getcwd(), iso_location))
         self.iso_process = Command(os.path.join(iso_location, 'iso'),
                                    stdout=Capture(buffer_size=1),
                                    env={"ISODATA": iso_location})
-        self.iso_process.run(input=PIPE, async=True)
-
+        try:
+            self.iso_process.run(input=PIPE, async=True)
+        except FileNotFoundError:
+            raise Exception("Couldn't find Isotropy for Linux, see installation instructions")
         # move past initial output
         keep_reading = True
         while keep_reading:

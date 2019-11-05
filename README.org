@@ -6,8 +6,6 @@ ISOTROPY tool in an automated fashion using python.
 The software can preform various tasks applying group theoretical methods to the
 analysis of crystalline solids.
 
-Obtain the ISOTROPY for linux executable [[https://stokes.byu.edu/iso/isolinux.php][here]].
-
 If you use this tool in publishing a paper you should cite:
 #+begin_example
 H. T. Stokes, D. M. Hatch, and B. J. Campbell, ISOTROPY Software Suite, iso.byu.edu.
@@ -15,6 +13,13 @@ H. T. Stokes, D. M. Hatch, and B. J. Campbell, ISOTROPY Software Suite, iso.byu.
 I am not affiliated with the ISOTROPY authors, but their
 tool is being used "under the hood" and they should be credited appropriately.
 
+
+Obtain the ISOTROPY for linux executable [[https://stokes.byu.edu/iso/isolinux.php][here]].
+
+After downloading and extracting the iso.zip file either place the iso directory
+inside the pysotropy directory (where the pysotropy.py and pysodistort.py files
+are) or create a symlink of the name iso to whereever it is you wish to keep
+your isotropy for linux executable.
 
 * pysotropy
 
