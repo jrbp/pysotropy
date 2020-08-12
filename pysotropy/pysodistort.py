@@ -372,7 +372,7 @@ def get_amps_direction(parent, irrep, irrep_amp, isos=None, k_params=None):
                 eqn_set.append(pos_d_sym - pos_a_sym)
             syms = list(syms)
             soln = linsolve(eqn_set, syms)
-            if soln == EmptySet():
+            if soln == EmptySet:
                 continue
             eqns = [0 == eqn.subs([(sy, val)
                                    for sy, val in zip(syms, list(soln)[0])])
