@@ -98,7 +98,7 @@ Simple (artificial) example on finding modes of a distorted perovskite:
 #+BEGIN_SRC ipython :session :ipyfile :exports :results output drawer :async t :pydir /home/john/.tmp-obpy
 import numpy as np
 import pymatgen as pmg
-import pysodistort as psd
+from pysotropy import pysodistort as psd
 
 cubic_structure = pmg.Structure(pmg.Lattice.cubic(4.0), species=['Sr', 'Ti', 'O', 'O', 'O'],
                             coords=[[0., 0., 0.],
