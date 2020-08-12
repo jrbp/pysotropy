@@ -11,6 +11,8 @@ import pysotropy as iso
 from sympy import sympify, linsolve, EmptySet
 from sympy.parsing.sympy_parser import (parse_expr, standard_transformations,
                                         implicit_multiplication_application)
+from pysotropy.patches import PATCH_StructureMatcher
+PATCH_StructureMatcher()
 # logger = logging.getLogger("pysotropy")
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
