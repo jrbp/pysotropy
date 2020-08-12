@@ -158,7 +158,7 @@ class IsotropySession:
                                    stdout=Capture(buffer_size=1),
                                    env={"ISODATA": iso_location})
         try:
-            self.iso_process.run(input=PIPE, async=True)
+            self.iso_process.run(input=PIPE, async_=True)
         except FileNotFoundError:
             raise Exception("Couldn't find Isotropy for Linux, see installation instructions")
         # move past initial output
